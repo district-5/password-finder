@@ -1,0 +1,10 @@
+Hi,
+
+Your encrypted backup is ready to download. The password is "Tp4#Rk8!" and is
+case sensitive.
+
+Please store it somewhere safe.
+
+Regards,
+Example Cloud
+example.com

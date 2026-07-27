@@ -1,0 +1,139 @@
+name: Detection issue (missed, mis-ranked, or false positive)
+description: The finder missed a password, ranked the wrong candidate first, or found a "password" that isn't one.
+title: "[detection] "
+labels: ["detection"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. Detection issues are much easier to fix with an
+        example message, so there is a field for one below.
+
+        ## Before you paste anything — read this
+
+        **Never put a real password in this issue, and never put anyone's personal
+        information in it.** Issues are public and permanent; deleting a comment does
+        not reliably un-publish what was in it.
+
+        Instead, rewrite the message so it is safe to share:
+
+        - **Replace the real password with an invented one of the same *shape*** —
+          same length, same mix of upper case, lower case, digits, and symbols, same
+          separators. Shape is what the scoring reacts to, so `Kf7-Qm2x` stands in
+          faithfully for a real `Ab3-Xy9p` (both score 0.96), whereas `mypassword`
+          scores 0.75 and `12345678` is rejected outright — either would change the
+          behaviour you are reporting. See
+          [tests/emails/README.md](https://github.com/district-5/py-password-extraction/blob/master/tests/emails/README.md)
+          for worked examples.
+        - Replace names, signatures, and job titles with invented ones.
+        - Replace email addresses with `someone@example.com`, links and domains with
+          `example.com`, and company or product names with "Example".
+        - Replace phone numbers, account, invoice, reference, and case numbers with
+          invented digits **of the same length** — length matters to the heuristics.
+        - Remove postal addresses, dates of birth, and anything else that identifies
+          a person.
+        - If the message came out of a real mailbox, strip the `Received:`,
+          `Message-ID:`, `DKIM-Signature:`, and `X-*` headers — they leak internal
+          hostnames and routing details.
+
+        Then check your anonymised version still reproduces the problem:
+
+        ```bash
+        find-password sample.txt
+        ```
+
+        If it no longer reproduces, say so in the report rather than pasting the
+        original — we would rather work from a vague description than have a real
+        password on the internet.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What went wrong?
+      options:
+        - The password was not found at all (no candidates returned)
+        - The right password was found, but ranked below a wrong one
+        - A "password" was found that is not a password (false positive)
+        - The password was found but came back mangled (wrong characters, truncated, extra punctuation)
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Anonymised sample message
+      description: |
+        The message body, with every real password and every piece of personal
+        information replaced as described above. Paste the text or HTML exactly as
+        the library receives it — whitespace, line breaks, and tags all affect
+        matching, so please don't tidy it up.
+      render: text
+      placeholder: |
+        Dear Member,
+
+        We have received your request. To retrieve your documents, your PIN: "5521-QT"
+
+        For your security, please do not reply to this message with the PIN.
+
+        Regards,
+        Example Membership
+        www.example.com
+  - type: input
+    id: expected
+    attributes:
+      label: Expected result
+      description: The (invented) password that should be the top candidate — or "no candidates" if the library should have found nothing here.
+      placeholder: 5521-QT
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: |
+        What you got instead. The output of `find-password sample.txt` is ideal, since
+        it shows every candidate with its confidence, keyword, and matching pattern.
+      render: text
+      placeholder: |
+        $ find-password sample.txt
+        (no candidates)
+    validations:
+      required: false
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: How you constructed the finder, if you changed anything from the defaults (`min_length`, `max_length`, `extra_keywords`, `decode_html`, a custom `FinderConfig` or `Weights`). Leave blank if you used defaults.
+      render: python
+      placeholder: |
+        finder = PasswordFinder(min_length=4, extra_keywords=["wachtwoord"])
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `pip show password-finder | grep -i version`, or the commit SHA if you installed from source.
+      placeholder: "2.1.0"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version and OS
+      placeholder: "Python 3.12.3, macOS 15.4"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Wider context, similar messages that do work, or a guess at the cause.
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Confirmation
+      options:
+        - label: This report contains **no real passwords** — any password shown is invented test data.
+          required: true
+        - label: This report contains **no personal or identifying information** — no real names, email addresses, phone numbers, addresses, account or reference numbers, real company names, real domains, or mail headers.
+          required: true
+        - label: I understand this issue is public, and that anything I paste here stays in the public record.
+          required: true

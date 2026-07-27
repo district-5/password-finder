@@ -1,0 +1,10 @@
+Dear Customer,
+
+Your appointment is confirmed.
+
+Your appointment reference code is: 12/03/2026
+Please arrive ten minutes early.
+
+Regards,
+Example Bookings
+example.com

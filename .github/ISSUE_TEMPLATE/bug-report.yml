@@ -1,0 +1,73 @@
+name: Bug report
+description: A crash, an exception, wrong types, packaging or CLI trouble — anything that isn't about which password was detected.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If the library ran fine but picked the wrong password (or none), please use
+        the **Detection issue** template instead — it asks for the right details.
+
+        > ### Keep real data out of this issue
+        > Issues are public and permanent. **Do not paste a real password, and do not
+        > paste anyone's personal information** — names, email addresses, phone
+        > numbers, addresses, account or reference numbers, real company names, real
+        > domains, or mail headers.
+        >
+        > If you need to include a sample message, invent one, or anonymise a real one:
+        > swap the password for an invented one of the same length and character mix,
+        > point every link at `example.com`, and call the sender "Example".
+        > Tracebacks count too — check the frames for message content before pasting.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: |
+        The smallest snippet that shows the problem. Use invented input — a made-up
+        string that triggers the bug is worth more than a real message.
+      render: python
+      placeholder: |
+        from password_finder import PasswordFinder
+
+        finder = PasswordFinder(min_length=0)
+        finder.find_all("The password is Kf7Qm2x")
+    validations:
+      required: false
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Traceback or error output
+      description: The full traceback, if there was one — with any real message content removed.
+      render: text
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `pip show password-finder | grep -i version`, or the commit SHA if you installed from source.
+      placeholder: "2.1.0"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version and OS
+      placeholder: "Python 3.9.18, Ubuntu 24.04"
+    validations:
+      required: true
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Confirmation
+      options:
+        - label: This report contains no real passwords and no personal or identifying information — including inside any traceback or command output I pasted.
+          required: true

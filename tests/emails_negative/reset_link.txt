@@ -1,0 +1,11 @@
+Hi,
+
+We received a request to reset your password.
+
+To reset your password, click: https://example.com/account/reset?token=abc123
+
+If you didn't ask for this, you can safely ignore this email.
+
+Thanks,
+Example Security
+example.com

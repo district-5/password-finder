@@ -1,0 +1,76 @@
+name: Feature request
+description: Suggest a new keyword, pattern, configuration knob, or capability.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > ### Keep real data out of this issue
+        > Issues are public and permanent. **No real passwords, and no personal
+        > information** — names, email addresses, phone numbers, addresses, account or
+        > reference numbers, real company names, real domains, or mail headers.
+        >
+        > Illustrate the idea with an invented message instead: a made-up password of
+        > a realistic shape (e.g. `Kf7-Qm2x`), a sender called "Example", and links
+        > pointing at `example.com`. If you are adapting a real email, replace the
+        > password with an invented one of the same length and character mix so the
+        > example still behaves like the original.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the situation the library handles badly today, rather than the fix you have in mind — it usually leads somewhere better.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like it to do?
+      description: |
+        Your suggested behaviour. If it's a new keyword or localised spelling, note
+        the language and roughly how the phrasing appears. If it's a scoring change,
+        say which signal you think is over- or under-weighted.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Invented example
+      description: An example message that would benefit, and the result you would want from it. Made-up content only.
+      render: text
+      placeholder: |
+        Hallo,
+
+        Das Kennwort zum Öffnen des Dokuments lautet: Kf7-Qm2x
+
+        Mit freundlichen Grüßen
+        Example GmbH
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Which part of the library would this touch?
+      description: A guess is fine — this is only for triage.
+      multiple: true
+      options:
+        - Keywords or localised spellings
+        - Match patterns (strict / loose / wrapped / nextline)
+        - Scoring and confidence
+        - Rejection rules (URLs, emails, phone numbers, dates, currency)
+        - HTML handling
+        - Configuration (FinderConfig / Weights)
+        - Command-line tools
+        - Documentation
+        - Not sure
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Including whether existing configuration (`extra_keywords`, a custom `FinderConfig` or `Weights`) already gets you close.
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Confirmation
+      options:
+        - label: This request contains no real passwords and no personal or identifying information.
+          required: true

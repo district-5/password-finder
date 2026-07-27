@@ -1,0 +1,12 @@
+Hello,
+
+The four documents each need a different key.
+
+passphrase: *Aq2-Wp5*
+passcode: "Bt7Nx1"
+access code: Cy9-Mk4
+unlock code: `Dz3Rp8`
+
+Regards,
+Example Records
+example.com

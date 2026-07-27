@@ -1,0 +1,465 @@
+"""Extract likely passwords from free-form text (plain text or HTML bodies)."""
+
+from __future__ import annotations
+
+import html
+import math
+import re
+from collections import Counter
+from typing import Iterable, Match, Pattern
+
+from .candidate import Candidate
+from .config import FinderConfig
+
+# --- Token shapes that are never a password (used to reject false positives) ---
+_URL_RE = re.compile(r"(?i)^(?:https?://|ftp://|www\.)")
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
+_TIME_RE = re.compile(r"^\d{1,2}:\d{2}(?::\d{2})?$")
+_DATE_RE = re.compile(
+    r"^(?:\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}|\d{4}[/.\-]\d{1,2}[/.\-]\d{1,2})$"
+)
+_CURRENCY_RE = re.compile(r"^[£$€¥]\d[\d,]*(?:\.\d+)?$")
+_PHONE_RE = re.compile(r"^[+()\d.\-\s]+$")
+# A domain-like "word.tld" optionally followed by a path -- catches whole URLs
+# and the fragments the loose pattern can carve out of one at its internal ":".
+_DOMAIN_RE = re.compile(r"(?i)[a-z0-9\-]{2,}\.[a-z]{2,}(?:/|$)")
+
+_OPENERS = frozenset('"\'“‘*`([{<')
+
+# Used to decide, automatically, whether a string is HTML: a tag-shaped run, or
+# an HTML entity (named, decimal, or hex).
+_HTML_TAG_RE = re.compile(r"<\s*[a-z!/][^>]*>", re.IGNORECASE)
+_HTML_ENTITY_RE = re.compile(r"&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]+);", re.IGNORECASE)
+
+
+def _entropy(s: str) -> float:
+    """Shannon entropy of a string in bits (higher == more random-looking)."""
+    if not s:
+        return 0.0
+    n = len(s)
+    return -sum((c / n) * math.log2(c / n) for c in Counter(s).values())
+
+
+class PasswordFinder:
+    """Extracts likely passwords from free-form text (plain text or HTML email
+    bodies).
+
+    Typical use case: an encrypted attachment arrives in one email and the
+    password to open it arrives in another, phrased in plain English -- e.g.
+    *"please use this password for opening the protected mail content:
+    Kp7mXq2"*. This library pulls ``"Kp7mXq2"`` back out.
+
+    The finder is deliberately non-committal: it ALWAYS returns a list of
+    candidates ranked by a heuristic confidence score, never a single string.
+    When a message contains several plausible passwords they are all returned,
+    most-likely first, so the caller can decide what to do.
+
+    Usage::
+
+        finder = PasswordFinder()
+
+        for c in finder.find_all(email_body):   # list[Candidate] (may be empty)
+            print(f"{c.password} ({c.confidence:.2f})")
+
+        passwords = finder.find_passwords(email_body)  # list[str] ranked
+    """
+
+    def __init__(
+        self,
+        min_length: int = 3,
+        max_length: int = 128,
+        extra_keywords: Iterable[str] | None = None,
+        decode_html: bool = True,
+        config: FinderConfig | None = None,
+    ) -> None:
+        """
+        :param min_length:     Passwords shorter than this (after trimming) are ignored.
+        :param max_length:     Passwords longer than this are ignored (avoids grabbing URLs etc.).
+        :param extra_keywords: Additional trigger keywords, each scored at 0.6.
+        :param decode_html:    When ``True`` (default), the finder automatically
+                               decides whether each string is HTML and, if so,
+                               strips tags / decodes entities before matching --
+                               callers never need to say which they are passing.
+                               Set ``False`` to force plain-text handling.
+        :param config:         Full :class:`FinderConfig` override (keywords, weights, ...).
+                               ``extra_keywords`` are merged on top of it.
+        """
+        cfg = config if config is not None else FinderConfig()
+        if extra_keywords:
+            cfg = cfg.with_extra_keywords(list(extra_keywords))
+        self._cfg = cfg
+
+        self._min_length = min_length
+        self._max_length = max_length
+        self._decode_html = decode_html
+        self._patterns = self._build_patterns()
+
+    # ------------------------------------------------------------------ API ---
+
+    def find_all(self, text: str) -> list[Candidate]:
+        """Return every candidate found, de-duplicated and ranked by confidence
+        (highest first). Candidates with an identical password string are
+        merged, keeping the highest-scoring occurrence. Always a list; empty if
+        nothing plausible was found.
+        """
+        text = self._normalise(text)
+        if text == "":
+            return []
+
+        by_password: dict[str, Candidate] = {}
+
+        for name, regex, mod in self._patterns:
+            for m in regex.finditer(text):
+                raw_token = self._group(m, "pw")
+                token = self._trim_token(raw_token)
+
+                if not self._is_plausible(token):
+                    continue
+
+                keyword = self._group(m, "keyword").strip().lower()
+                connector = self._group(m, "connector").strip()
+                filler = self._group(m, "filler").strip()
+                start = m.start("pw")
+                gap = max(0, start - m.end("keyword"))
+                wrapped = raw_token[:1] in _OPENERS and raw_token != token
+
+                confidence = self._score(token, keyword, connector, filler, gap, wrapped, mod)
+
+                existing = by_password.get(token)
+                if existing is None or confidence > existing.confidence:
+                    by_password[token] = Candidate(
+                        password=token,
+                        confidence=confidence,
+                        keyword=keyword,
+                        context=self._context(text, start, len(raw_token)),
+                        offset=start,
+                        pattern=name,
+                        span=(start, start + len(raw_token)),
+                    )
+
+        candidates = list(by_password.values())
+        candidates.sort(key=lambda c: c.confidence, reverse=True)
+
+        return candidates
+
+    def find_passwords(self, text: str) -> list[str]:
+        """Return just the password strings, ranked by confidence (highest
+        first). Always a list; empty if nothing plausible was found.
+        """
+        return [c.password for c in self.find_all(text)]
+
+    # -------------------------------------------------------------- internals ---
+
+    @staticmethod
+    def _group(m: Match[str], name: str) -> str:
+        """Named group value, or ``""`` when the group is absent/unmatched."""
+        try:
+            value = m.group(name)
+        except IndexError:
+            # Group not present in the pattern that produced this match.
+            return ""
+        return value if value is not None else ""
+
+    def _build_patterns(self) -> list[tuple[str, Pattern[str], float]]:
+        keywords = sorted(self._cfg.keywords.keys(), key=len, reverse=True)
+
+        # A single space OR hyphen in a keyword also matches the other, or
+        # nothing: "pass phrase" == "pass-phrase" == "passphrase";
+        # "one-time" == "one time" == "onetime".
+        sep = r"[\s\-]?"
+
+        def compile_keyword(k: str) -> str:
+            escaped = re.escape(k)
+            for token in ("\\ ", " ", "\\-", "-"):
+                escaped = escaped.replace(token, sep)
+            return escaped
+
+        kw = "|".join(compile_keyword(k) for k in keywords)
+        fill = "|".join(re.escape(w) for w in self._cfg.filler_words)
+        conn = r"[:=]+|\bis\b|\bare\b|\bwas\b|will\s+be|shall\s+be|would\s+be|to\s+use|-+>|:-"
+        open_ = "[\"'“‘*`(\\[{<]"
+
+        flags = re.IGNORECASE | re.UNICODE
+        w = self._cfg.weights
+
+        return [
+            # 1. Strict: keyword + curated filler words + an explicit connector.
+            (
+                "strict",
+                re.compile(
+                    r"\b(?P<keyword>%s)\b(?P<filler>(?:\s+(?:%s)\b){0,8})?[ \t]*"
+                    r"(?P<connector>%s)[\s:=]*(?P<pw>\S{2,160})" % (kw, fill, conn),
+                    flags,
+                ),
+                w.strict_mod,
+            ),
+            # 2. Loose: keyword + arbitrary same-line text up to a ":" or "=".
+            (
+                "loose",
+                re.compile(
+                    r"\b(?P<keyword>%s)\b(?P<filler>[^\n\r:=]{0,60}?)[ \t]*"
+                    r"(?P<connector>[:=]+)[ \t]*(?P<pw>\S{2,160})" % kw,
+                    flags,
+                ),
+                w.loose_mod,
+            ),
+            # 3. Wrapped: keyword immediately followed by a delimited value with
+            #    no connector, e.g. password (Zap!123) or password "abc".
+            (
+                "wrapped",
+                re.compile(
+                    r"\b(?P<keyword>%s)\b[ \t]*(?P<pw>%s\S{1,159})" % (kw, open_),
+                    flags,
+                ),
+                w.wrapped_mod,
+            ),
+            # 4. Next line: keyword (optionally with a bare connector) at the end
+            #    of a line, and the value alone on a following line. Catches
+            #    label/value layouts, incl. adjacent HTML table cells once
+            #    </td>/</th> have been turned into line breaks by _normalise().
+            (
+                "nextline",
+                re.compile(
+                    r"\b(?P<keyword>%s)\b[ \t]*(?P<connector>[:=]?)[ \t]*\r?\n"
+                    r"[ \t\r\n]*(?P<pw>\S{2,160})(?=[ \t]*\r?\n|[ \t]*$)" % kw,
+                    flags,
+                ),
+                w.nextline_mod,
+            ),
+        ]
+
+    @staticmethod
+    def looks_like_html(text: str) -> bool:
+        """Return ``True`` when the string appears to be HTML rather than plain
+        text -- it contains a tag-shaped run or an HTML entity. Used internally
+        to decide automatically how to treat each input; exposed so callers can
+        make the same decision if they need to.
+        """
+        return bool(_HTML_TAG_RE.search(text) or _HTML_ENTITY_RE.search(text))
+
+    def _normalise(self, text: str) -> str:
+        """Turn an HTML body into plain text so keyword matching works. No-op
+        when the text does not look like HTML, or when decoding is disabled.
+        """
+        if text == "" or not self._decode_html:
+            return text
+
+        # Automatically decide whether this string is HTML; leave plain text be.
+        if not self.looks_like_html(text):
+            return text
+
+        # Drop <script>/<style> blocks (and HTML comments) entirely -- their
+        # content is never body text and would otherwise leak CSS/JS noise.
+        text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
+        text = re.sub(
+            r"<\s*(script|style)\b[^>]*>.*?<\s*/\s*\1\s*>",
+            " ",
+            text,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+
+        # Block-level and table-cell tags become line breaks so words don't run
+        # together and label/value cells land on separate lines.
+        text = re.sub(
+            r"<\s*(?:br|/p|/div|/li|/tr|/td|/th|/h[1-6])\b[^>]*>",
+            "\n",
+            text,
+            flags=re.IGNORECASE,
+        )
+        # Strip any remaining tags.
+        text = re.sub(r"<[^>]*>", "", text)
+
+        return html.unescape(text)
+
+    def _trim_token(self, token: str) -> str:
+        """Strip surrounding quotes/markers and trailing sentence punctuation."""
+        pairs = {
+            '"': '"', "'": "'", "“": "”", "‘": "’",
+            "`": "`", "(": ")", "[": "]", "{": "}", "<": ">", "*": "*",
+        }
+        stray_closers = (")", "]", "}", ">", '"', "'", "”", "’", "*", "`")
+        stray_openers = ("(", "[", "{", "<", '"', "'", "“", "‘", "*", "`")
+
+        while True:
+            before = token
+
+            # Matched wrapper pair around the whole token.
+            if len(token) >= 2 and token[0] in pairs and pairs[token[0]] == token[-1]:
+                token = token[1:-1]
+
+            # Trailing sentence punctuation that is rarely part of a password.
+            # Note: "!" and "?" are kept -- they are common password characters.
+            token = token.rstrip(".,;:…")
+
+            # Stray closing wrapper with no matching opener in the token.
+            if token and token[-1] in stray_closers and not self._token_has_opener_for(token, token[-1]):
+                token = token[:-1]
+
+            # Stray opening wrapper at the start.
+            if token and token[0] in stray_openers:
+                token = token[1:]
+
+            if token == before or token == "":
+                break
+
+        return token
+
+    @staticmethod
+    def _token_has_opener_for(token: str, closer: str) -> bool:
+        openers = {")": "(", "]": "[", "}": "{", ">": "<"}
+        opener = openers.get(closer)
+        return opener is not None and opener in token
+
+    def _is_plausible(self, token: str) -> bool:
+        length = len(token)
+        if length < self._min_length or length > self._max_length:
+            return False
+
+        # Pure punctuation / no alphanumerics at all.
+        if not any(ch.isalnum() for ch in token):
+            return False
+
+        if token.lower() in self._cfg.reject_tokens:
+            return False
+
+        # Shapes that are never a password (URL, email, date, time, ...).
+        if self._looks_like_non_password(token):
+            return False
+
+        return True
+
+    @staticmethod
+    def _looks_like_non_password(token: str) -> bool:
+        if "://" in token or token.startswith("//") or _URL_RE.match(token):
+            return True
+        if _EMAIL_RE.match(token):
+            return True
+        # Bare domain or domain/path (incl. a URL fragment split off at its ":").
+        if "." in token and _DOMAIN_RE.search(token):
+            return True
+        if _TIME_RE.match(token):
+            return True
+        if _DATE_RE.match(token):
+            return True
+        if _CURRENCY_RE.match(token):
+            return True
+        # Telephone-shaped: mostly digits with separators, no letters.
+        digits = sum(ch.isdigit() for ch in token)
+        if digits >= 7 and _PHONE_RE.match(token):
+            return True
+        return False
+
+    def _base_score(self, keyword: str) -> float:
+        kws = self._cfg.keywords
+        if keyword in kws:
+            return kws[keyword]
+        # Normalise spelling ("pass-word", "one time code" ...) back to a base.
+        collapsed = keyword.replace(" ", "").replace("-", "")
+        for k, v in kws.items():
+            if k.replace(" ", "").replace("-", "") == collapsed:
+                return v
+        return self._cfg.weights.default_keyword_score
+
+    def _score(
+        self,
+        token: str,
+        keyword: str,
+        connector: str,
+        filler: str,
+        gap: int,
+        wrapped: bool,
+        modifier: float,
+    ) -> float:
+        w = self._cfg.weights
+        score = self._base_score(keyword) + modifier
+
+        # Connector strength: ":"/"=" beats a word connector beats nothing.
+        if connector and (":" in connector or "=" in connector):
+            score += w.colon_bonus
+        elif connector:
+            score += w.soft_connector_bonus
+        else:
+            score -= w.no_connector_penalty
+
+        # Filler words between keyword and value add ambiguity.
+        if filler:
+            filler_words = len(re.findall(r"\S+", filler))
+            score -= min(w.filler_penalty_cap, filler_words * w.filler_word_penalty)
+
+        # Proximity: raw character distance between keyword and value.
+        if gap > w.distance_free_chars:
+            score -= min(
+                w.distance_penalty_cap,
+                (gap - w.distance_free_chars) * w.distance_penalty_per_char,
+            )
+
+        # Token length.
+        length = len(token)
+        if 6 <= length <= 40:
+            score += w.good_length_bonus
+        if length < 4:
+            score -= w.short_penalty
+
+        # Character-class diversity (lower/upper/digit/symbol).
+        has_lower = any(ch.islower() for ch in token)
+        has_upper = any(ch.isupper() for ch in token)
+        has_digit = any(ch.isdigit() for ch in token)
+        has_symbol = any(not ch.isalnum() for ch in token)
+        classes = has_lower + has_upper + has_digit + has_symbol
+        score += w.class_bonus_per_class * max(0, classes - 1)
+
+        # Randomness: a high-entropy token looks generated, not typed.
+        score += w.entropy_scale * min(w.entropy_cap, _entropy(token))
+
+        # Looks like a plain lowercase dictionary word: mildly penalise.
+        if re.fullmatch(r"[a-z]+", token) and length > 3:
+            score -= w.lowercase_word_penalty
+
+        # A deliberately quoted/bracketed value is a strong "this exact string"
+        # signal from the sender.
+        if wrapped:
+            score += w.wrapped_value_bonus
+
+        # A long pure-digit run is much more likely a reference/policy number.
+        if token.isdigit() and length >= w.reference_number_min_digits:
+            score -= w.reference_number_penalty
+
+        return max(w.min_score, min(w.max_score, round(score, 3)))
+
+    def _context(self, text: str, offset: int, token_len: int) -> str:
+        if offset < 0:
+            return ""
+
+        start = max(0, offset - 40)
+        length = (offset - start) + token_len + 40
+        snippet = text[start:start + length]
+
+        # Collapse whitespace/newlines for a tidy one-line context.
+        snippet = re.sub(r"\s+", " ", snippet).strip()
+
+        return ("…" if start > 0 else "") + snippet + "…"
+
+
+# --------------------------------------------------------------------------- #
+# Module-level convenience: string in -> passwords/candidates out, no object   #
+# to construct. HTML vs plain text is detected automatically.                  #
+# --------------------------------------------------------------------------- #
+
+
+def find_passwords(text: str, **options) -> list[str]:
+    """Extract passwords from a string, ranked by confidence (highest first).
+
+    A one-shot convenience wrapper around :class:`PasswordFinder`. HTML and
+    plain text are both accepted and told apart automatically. ``**options`` are
+    forwarded to the :class:`PasswordFinder` constructor (``min_length``,
+    ``config``, ...).
+
+    >>> find_passwords("The password is Hunter2!")
+    ['Hunter2!']
+    """
+    return PasswordFinder(**options).find_passwords(text)
+
+
+def find_all(text: str, **options) -> list[Candidate]:
+    """Like :func:`find_passwords`, but returns full :class:`Candidate` objects."""
+    return PasswordFinder(**options).find_all(text)

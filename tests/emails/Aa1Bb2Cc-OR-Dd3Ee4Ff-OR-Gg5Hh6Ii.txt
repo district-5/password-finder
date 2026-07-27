@@ -1,0 +1,11 @@
+Hi,
+
+Three secure documents are attached, each with its own password.
+
+Password one: Aa1Bb2Cc
+Password two: *Dd3Ee4Ff*
+Password three: 'Gg5Hh6Ii'
+
+Thanks,
+Example Reporting
+example.com

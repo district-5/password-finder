@@ -1,0 +1,11 @@
+Hello,
+
+Your encrypted payslip is attached.
+
+passphrase: `Sy8Lp3Qb`
+
+Please contact payroll if you have any questions.
+
+Kind regards,
+Example Payroll
+www.example.com
