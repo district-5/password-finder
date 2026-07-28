@@ -107,16 +107,20 @@ sorts to the top. Because it is heuristic, always sanity-check
 
 ## Configuration
 
-Basic knobs:
+Basic knobs, shown with their defaults:
 
 ```python
 finder = PasswordFinder(
-    min_length=6,                        # ignore very short tokens
-    max_length=64,                       # ignore very long tokens (URLs etc.)
-    extra_keywords=["clé", "wachtwoord"], # add your own trigger words
-    decode_html=True,                    # strip HTML before matching (default)
+    min_length=3,                        # ignore very short tokens
+    max_length=128,                      # ignore very long tokens (URLs etc.)
+    extra_keywords=None,                 # add your own trigger words
+    decode_html=True,                    # strip HTML before matching
 )
 ```
+
+Raising `min_length` and lowering `max_length` is the quickest way to trade
+recall for precision — e.g. `PasswordFinder(min_length=6, max_length=64)` if you
+know the passwords you care about are never shorter than six characters.
 
 Everything the finder uses — keywords and their base scores, the filler/reject
 word lists, and every scoring weight — lives in `FinderConfig` and can be

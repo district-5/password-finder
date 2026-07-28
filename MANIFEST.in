@@ -1,10 +1,11 @@
 # Keep the source distribution in step with the wheel: ship the package, the
-# license, and the readme -- but not tests, fixtures, CI config, or build
-# artefacts. (Tests are dev-only and the email fixtures contain password-shaped
-# test data that has no place in a distributed artefact.)
+# license, the readme, and the security policy -- but not tests, fixtures, CI
+# config, or build artefacts. (Tests are dev-only and the email fixtures contain
+# password-shaped test data that has no place in a distributed artefact.)
 
 include LICENSE
 include README.md
+include SECURITY.md
 include pyproject.toml
 
 prune tests
