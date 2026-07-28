@@ -67,6 +67,12 @@ Emails that must **not** yield a convincing password go in
 next to URLs, dates, or phone numbers. `test_negative_corpus.py` asserts nothing
 crosses a confidence threshold, which is what guards precision.
 
+Passwords made of punctuation and symbols go in
+`tests/emails-special-characters/`, which uses a different convention because
+characters like `/` and `\` cannot appear in a file name: **the first line of the
+file is the expected password**, and the test strips it before matching. See
+[that directory's README](tests/emails-special-characters/README.md).
+
 Check your fixture by hand before committing:
 
 ```bash

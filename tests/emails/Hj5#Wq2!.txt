@@ -1,0 +1,13 @@
+Hi,
+
+Replacement credential for the archive you could not open -- the previous one
+had a typo in it.
+
+The password is "Hj5#Wq2!"
+
+Both the hash and the exclamation mark are part of it. Copy and paste rather
+than typing it by hand.
+
+Thanks,
+Example IT Support
+support@example.com

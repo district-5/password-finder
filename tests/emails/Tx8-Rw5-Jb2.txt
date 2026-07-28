@@ -1,0 +1,14 @@
+Hello,
+
+The signed schedules you asked for have been scanned in. The scanner names its
+output automatically, so the file is called SKM_C224e_2026-07-14_11.02.33.pdf
+rather than anything sensible. Apologies for that.
+
+Passphrase for the PDF: Tx8-Rw5-Jb2
+
+Shout if it will not open and I will re-scan it.
+
+Thanks,
+J. Okonkwo
+Example Surveyors
+surveys@example.com

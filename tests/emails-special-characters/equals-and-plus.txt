@@ -1,0 +1,14 @@
+Kd9=Rt2+Ls
+
+Hi,
+
+The base64-looking credential below is intentional -- it came out of our key
+store as-is.
+
+Password: Kd9=Rt2+Ls
+
+The encrypted bundle will be sent separately this afternoon.
+
+Thanks,
+Example Security Operations
+secops@example.com

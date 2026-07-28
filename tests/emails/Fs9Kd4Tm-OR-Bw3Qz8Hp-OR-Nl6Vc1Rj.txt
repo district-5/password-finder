@@ -1,0 +1,14 @@
+Dear all,
+
+The three tender responses have been unsealed. Each is encrypted with its own
+credential, listed below in the order the files were received.
+
+Passphrase for the first submission: Fs9Kd4Tm
+Passphrase for the second submission: Bw3Qz8Hp
+Passphrase for the third submission: Nl6Vc1Rj
+
+The files themselves follow in three separate emails, each named
+EXAMPLE-TENDER-Lot#{n}.7z where {n} is the submission number.
+
+Example Procurement
+tenders@example.com

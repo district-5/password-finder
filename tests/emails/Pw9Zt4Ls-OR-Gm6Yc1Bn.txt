@@ -1,0 +1,13 @@
+Hi,
+
+Both files from the audit are attached. They were exported separately, so they
+do not share credentials.
+
+The password for the first document is: Pw9Zt4Ls
+The password for the second document is: Gm6Yc1Bn
+
+The second file is the larger of the two (Example_Audit_WP~2.zip).
+
+Regards,
+Example Audit
+audit@example.com

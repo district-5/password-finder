@@ -1,0 +1,12 @@
+Kx4.Nq9!
+
+Hi,
+
+Encrypted statement attached.
+
+Password: Kx4.Nq9!
+
+There is a full stop inside the credential; the exclamation mark ends it.
+
+Example Statements
+statements@example.com

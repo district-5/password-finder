@@ -172,10 +172,19 @@ runs the finder over each one and asserts those passwords are the top-ranked
 candidates, so dropping a new email in there and naming it after its password(s)
 is enough to add a regression test.
 
+`tests/emails-special-characters/` holds passwords made of punctuation and
+symbols — including characters a file name cannot contain — so it uses a
+different convention: **the first line of the file is the expected password**,
+and `test_special_character_fixtures.py` strips that line before matching. This
+is where trimming, HTML entity decoding, and the rejection rules get exercised.
+
 `tests/emails_negative/` holds the **negative corpus** — realistic emails that
 must *not* yield a convincing password (marketing, statements, and keywords
 sitting next to URLs / dates / phone numbers). `test_negative_corpus.py` asserts
 nothing crosses a confidence threshold, guarding against precision regressions.
+
+Each fixture directory has a `README.md` explaining its convention and how to
+anonymise a real message before adding it.
 
 ## License
 

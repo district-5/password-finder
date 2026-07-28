@@ -1,0 +1,13 @@
+Hi,
+
+Sending this ahead of the file itself, as our mail gateway strips encrypted
+archives that arrive alongside their credentials.
+
+Password: Zq6Lm3Pw
+
+The archive will be sent from the same address tomorrow morning once the
+overnight run has finished. Keep this message until it arrives.
+
+Best,
+Example Data Services
+operations@example.com
