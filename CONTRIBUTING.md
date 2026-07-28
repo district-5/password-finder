@@ -38,7 +38,7 @@ module.
 
 ## Reporting something
 
-Use the [issue templates](https://github.com/district-5/py-password-extraction/issues/new/choose):
+Use the [issue templates](https://github.com/district-5/password-finder/issues/new/choose):
 
 - **Detection issue** — the finder missed a password, ranked the wrong candidate
   first, or found something that isn't a password. Include an anonymised sample.

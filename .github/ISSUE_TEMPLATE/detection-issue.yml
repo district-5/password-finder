@@ -23,7 +23,7 @@ body:
           faithfully for a real `Ab3-Xy9p` (both score 0.96), whereas `mypassword`
           scores 0.75 and `12345678` is rejected outright — either would change the
           behaviour you are reporting. See
-          [tests/emails/README.md](https://github.com/district-5/py-password-extraction/blob/master/tests/emails/README.md)
+          [tests/emails/README.md](https://github.com/district-5/password-finder/blob/master/tests/emails/README.md)
           for worked examples.
         - Replace names, signatures, and job titles with invented ones.
         - Replace email addresses with `someone@example.com`, links and domains with

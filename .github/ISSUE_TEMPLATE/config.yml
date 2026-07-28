@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: How to anonymise an email before sharing it
-    url: https://github.com/district-5/py-password-extraction/blob/master/tests/emails/README.md
+    url: https://github.com/district-5/password-finder/blob/master/tests/emails/README.md
     about: Read this first if your report includes a sample message. Never paste a real password or anyone's personal information into a public issue.
   - name: Question or idea (not a bug)
-    url: https://github.com/district-5/py-password-extraction/discussions
+    url: https://github.com/district-5/password-finder/discussions
     about: Ask how to use the library, or float an idea before opening an issue.

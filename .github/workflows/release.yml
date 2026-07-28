@@ -5,7 +5,7 @@ name: Release
 #
 # One-time setup, both required before the first tag:
 #   1. On PyPI: Account -> Publishing -> add a GitHub publisher with
-#        owner: district-5   repo: py-password-extraction
+#        owner: district-5   repo: password-finder
 #        workflow: release.yml   environment: pypi
 #   2. On GitHub: Settings -> Environments -> create an environment named "pypi"
 #        (adding required reviewers there gives you a manual gate before upload)

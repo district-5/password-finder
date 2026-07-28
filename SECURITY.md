@@ -5,7 +5,7 @@
 **Please do not open a public issue for a security problem.**
 
 Use GitHub's private vulnerability reporting instead: go to the
-[Security tab](https://github.com/district-5/py-password-extraction/security)
+[Security tab](https://github.com/district-5/password-finder/security)
 and choose **Report a vulnerability**. That channel is private to you and the
 maintainers.
 
@@ -62,7 +62,7 @@ In scope:
   release, or a tampered artefact.
 
 Out of scope — real reports, but not security ones, so please use the
-[issue templates](https://github.com/district-5/py-password-extraction/issues/new/choose):
+[issue templates](https://github.com/district-5/password-finder/issues/new/choose):
 
 - The finder **missing** a password, ranking the wrong candidate first, or
   returning a false positive. These are detection bugs. The library is
