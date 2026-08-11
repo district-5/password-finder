@@ -98,6 +98,9 @@ DEFAULT_REJECT_TOKENS: frozenset[str] = frozenset({
     "expired", "expires", "invalid", "incorrect", "unavailable", "enter",
     "download", "regards", "sincerely", "thanks", "copyright", "enquiries",
     "team", "support", "www", "http", "https",
+    # Boilerplate around the password in delivery emails: "the password is
+    # CASE SENSITIVE", "password below", etc.
+    "case", "sensitive",
 })
 
 
@@ -113,6 +116,7 @@ class Weights:
     loose_mod: float = -0.15
     wrapped_mod: float = 0.02
     nextline_mod: float = -0.22
+    delimited_mod: float = -0.05  # value set off in quotes/emphasis, no connector
 
     # Connector signals.
     colon_bonus: float = 0.15          # an explicit ":" or "=" ("value follows")

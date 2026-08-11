@@ -21,3 +21,6 @@ htmlcov/
 # Editors
 .idea/
 .vscode/
+
+tests/emails-private/*
+!tests/emails-private/.gitkeep

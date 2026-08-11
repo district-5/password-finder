@@ -26,6 +26,21 @@ _DOMAIN_RE = re.compile(r"(?i)[a-z0-9\-]{2,}\.[a-z]{2,}(?:/|$)")
 
 _OPENERS = frozenset('"\'“‘*`([{<')
 
+# Matching delimiter pairs for the "delimited" pattern: a value the sender set
+# off in quotes / emphasis / brackets. Inner length >= 2 so junk like the "(s)"
+# in "document(s)" is skipped in favour of the real value further along.
+_DELIMITED_VALUE = (
+    r'\*[^*\s]{2,160}\*'
+    r'|"[^"\s]{2,160}"'
+    r"|'[^'\s]{2,160}'"
+    r'|`[^`\s]{2,160}`'
+    r'|\([^)\s]{2,160}\)'
+    r'|\[[^\]\s]{2,160}\]'
+    r'|\{[^}\s]{2,160}\}'
+    r'|“[^”\s]{2,160}”'
+    r'|‘[^’\s]{2,160}’'
+)
+
 # Used to decide, automatically, whether a string is HTML: a tag-shaped run, or
 # an HTML entity (named, decimal, or hex).
 _HTML_TAG_RE = re.compile(r"<\s*[a-z!/][^>]*>", re.IGNORECASE)
@@ -226,6 +241,21 @@ class PasswordFinder:
                 ),
                 w.nextline_mod,
             ),
+            # 5. Delimited: keyword followed -- within a short window that may
+            #    cross one line wrap -- by a value the sender set off in
+            #    quotes/emphasis/brackets, with no explicit connector. Catches
+            #    natural-language sentences where the value sits a few words (or
+            #    a sentence) after the keyword, e.g. "please use the following
+            #    password to access the document(s). *Ab12Cd34*".
+            (
+                "delimited",
+                re.compile(
+                    r"\b(?P<keyword>%s)\b(?P<filler>[^\r\n]{0,48}?(?:\r?\n[^\r\n]{0,48}?)?)"
+                    r"(?P<pw>%s)" % (kw, _DELIMITED_VALUE),
+                    flags,
+                ),
+                w.delimited_mod,
+            ),
         ]
 
     @staticmethod
@@ -263,6 +293,16 @@ class PasswordFinder:
         text = re.sub(
             r"<\s*(?:br|/p|/div|/li|/tr|/td|/th|/h[1-6])\b[^>]*>",
             "\n",
+            text,
+            flags=re.IGNORECASE,
+        )
+        # Inline emphasis (bold/italic/underline/highlight) is the HTML
+        # equivalent of wrapping a value in *asterisks*: senders routinely
+        # emphasise the password. Turn the tags into "*" so that signal
+        # survives tag-stripping and the "delimited" pattern can use it.
+        text = re.sub(
+            r"<\s*/?\s*(?:b|strong|i|em|mark|u)\b[^>]*>",
+            "*",
             text,
             flags=re.IGNORECASE,
         )
@@ -411,8 +451,10 @@ class PasswordFinder:
         # Randomness: a high-entropy token looks generated, not typed.
         score += w.entropy_scale * min(w.entropy_cap, _entropy(token))
 
-        # Looks like a plain lowercase dictionary word: mildly penalise.
-        if re.fullmatch(r"[a-z]+", token) and length > 3:
+        # Looks like a plain dictionary word: all letters, one case (e.g.
+        # "password", "CASE", "SENSITIVE"). Mildly penalise. Mixed-case alpha
+        # (e.g. "aTlKeiEa") is left alone -- it does not read as a word.
+        if length > 3 and token.isalpha() and (token.islower() or token.isupper()):
             score -= w.lowercase_word_penalty
 
         # A deliberately quoted/bracketed value is a strong "this exact string"
