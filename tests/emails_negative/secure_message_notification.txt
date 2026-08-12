@@ -1,0 +1,9 @@
+Secure Messaging
+Notification
+You have been sent a secure message by Example. View the
+message by clicking here. It has been classified as sensitive and may only
+be accessed from within this Secure Messaging service. Need help? If this
+is the first time you have received a secure message from this company, a
+password will be emailed to you separately. If you did not receive your
+password or are experiencing trouble logging in, click here to request a
+new password.

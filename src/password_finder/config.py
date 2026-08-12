@@ -90,6 +90,10 @@ DEFAULT_REJECT_TOKENS: frozenset[str] = frozenset({
     "is", "are", "be", "the", "a", "an", "to", "as", "below", "above",
     "attached", "attachment", "here", "follows", "following", "same",
     "provided", "sent", "separately", "separate", "and", "or", "will",
+    # Passive-delivery verbs: "a password will be emailed/issued to you" means
+    # the password is being sent, not present in this message.
+    "emailed", "e-mailed", "mailed", "posted", "issued", "supplied",
+    "generated", "created", "delivered", "forwarded", "given", "shared",
     "protected", "required", "needed", "blank", "empty", "none", "n/a",
     "na", "tbc", "tba", "if", "in", "on", "of", "for", "this", "that",
     # UI / call-to-action words that follow "password" in web/app emails.
