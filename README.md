@@ -71,14 +71,21 @@ The finder scans for password-related keywords — `password`, `passphrase`,
 `passcode`, `access code`, `unlock code`, `one-time code`, `authentication
 code`, `login credentials`, `pwd`, `pin`, `code`, `secret`, localised spellings
 (`kennwort`, `mot de passe`, `contraseña`, …) and more — optionally followed by
-filler words (*"for opening the protected mail content"*) and a connector (`:`,
-`=`, or `is`), then captures the token that follows. It matches four layouts:
+filler words (*"for opening the protected mail content"*) and, in most layouts, a
+connector (`:`, `=`, or a word like `is` / `will be`), then captures the token
+that follows. It matches six layouts:
 
 1. **strict** — keyword + curated filler + connector,
 2. **loose** — keyword + free text up to a `:`/`=`,
 3. **wrapped** — keyword immediately followed by a quoted/bracketed value,
 4. **nextline** — keyword alone on a line with the value on the next line
-   (this also recovers label/value pairs in adjacent HTML table cells).
+   (this also recovers label/value pairs in adjacent HTML table cells),
+5. **delimited** — keyword followed, a few words (or a sentence) later, by a value
+   the sender set off in quotes, `*emphasis*` or brackets, with no connector —
+   this catches natural-language phrasings, and HTML emphasis such as `<b>…</b>`
+   counts as a delimiter,
+6. **proximity** — a last-resort fallback: a bare, undelimited token that mixes
+   letters *and* digits sitting close to the keyword.
 
 Values wrapped in quotes, `*markdown*`, `` `backticks` `` or `(brackets)` are
 unwrapped automatically. The matching `pattern` and character `span` are exposed
@@ -97,6 +104,8 @@ Signals that lower it, or reject the match outright:
 
 - lots of filler words / large distance between the keyword and the value,
 - the "password" being a plain word like `attached`, `below`, `reset`, or `is`,
+- a passive-delivery phrase such as *"a password will be emailed to you"*, where
+  no password is actually present (`emailed`, `issued`, `sent`, … are rejected),
 - a long pure-digit run (looks like a reference/policy number),
 - shapes that are **never** passwords: URLs, email addresses, phone numbers,
   dates, times, and currency amounts — these are rejected outright.
@@ -180,8 +189,16 @@ is where trimming, HTML entity decoding, and the rejection rules get exercised.
 
 `tests/emails_negative/` holds the **negative corpus** — realistic emails that
 must *not* yield a convincing password (marketing, statements, and keywords
-sitting next to URLs / dates / phone numbers). `test_negative_corpus.py` asserts
-nothing crosses a confidence threshold, guarding against precision regressions.
+sitting next to URLs / dates / phone numbers, or passive-delivery phrasings like
+*"a password will be emailed to you"*). `test_negative_corpus.py` asserts nothing
+crosses a confidence threshold, guarding against precision regressions.
+
+`tests/emails-private/` is a **git-ignored** directory for real, un-anonymised
+messages you don't want committed. Drop `.txt`/`.html` files in — named after
+their password(s), exactly like `tests/emails/` — and
+`test_email_private_fixtures.py` runs the same top-candidate assertion against
+them locally. It ships empty (bar a `.gitkeep`), so in a clean checkout those
+tests simply have nothing to run.
 
 Each fixture directory has a `README.md` explaining its convention and how to
 anonymise a real message before adding it.
