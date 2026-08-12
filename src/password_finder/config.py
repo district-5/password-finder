@@ -117,6 +117,7 @@ class Weights:
     wrapped_mod: float = 0.02
     nextline_mod: float = -0.22
     delimited_mod: float = -0.05  # value set off in quotes/emphasis, no connector
+    proximity_mod: float = -0.10  # bare letter+digit token near a keyword
 
     # Connector signals.
     colon_bonus: float = 0.15          # an explicit ":" or "=" ("value follows")

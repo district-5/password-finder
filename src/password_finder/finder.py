@@ -256,6 +256,23 @@ class PasswordFinder:
                 ),
                 w.delimited_mod,
             ),
+            # 6. Proximity: keyword followed -- within a short window that may
+            #    cross one line wrap -- by a bare, undelimited token that is
+            #    strongly password-shaped (contains BOTH a letter and a digit).
+            #    A last-resort fallback for natural-language sentences with no
+            #    connector and no delimiter, e.g. "please use the following
+            #    password to access the file(s). KRVBs699gqp3xeaq Please
+            #    note ...". Requiring a letter AND a digit keeps prose words
+            #    (which never mix the two) from matching.
+            (
+                "proximity",
+                re.compile(
+                    r"\b(?P<keyword>%s)\b(?P<filler>[^\r\n]{0,40}?(?:\r?\n[^\r\n]{0,40}?)?)"
+                    r"(?P<pw>(?=\S*[A-Za-z])(?=\S*\d)\S{4,160})" % kw,
+                    flags,
+                ),
+                w.proximity_mod,
+            ),
         ]
 
     @staticmethod
