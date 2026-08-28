@@ -192,6 +192,23 @@ class PasswordFinder:
         kw = "|".join(compile_keyword(k) for k in keywords)
         fill = "|".join(re.escape(w) for w in self._cfg.filler_words)
         conn = r"[:=]+|\bis\b|\bare\b|\bwas\b|will\s+be|shall\s+be|would\s+be|to\s+use|-+>|:-"
+
+        def filler(budget: int) -> str:
+            """The run the delimited/proximity patterns allow between keyword
+            and value: ``budget`` characters of the keyword's own line, or that
+            plus a line break -- one blank line included, since senders
+            routinely set the value on a paragraph of its own -- and ``budget``
+            characters of the line the value sits on.
+
+            Crossing the break requires the keyword's line to carry at least one
+            more visible character ("... the password to open it.\\n\\nAb12Cd34").
+            A keyword that ends its line is a label, and belongs to the
+            "nextline" pattern, which scores that weaker layout accordingly.
+            """
+            same_line = r"[^\r\n]{0,%d}?" % budget
+            break_ = r"[^\s\r\n][ \t]*\r?\n(?:[ \t]*\r?\n)?[ \t]*"
+            return r"(?P<filler>%s|%s%s%s)" % (same_line, same_line, break_, same_line)
+
         open_ = "[\"'“‘*`(\\[{<]"
 
         flags = re.IGNORECASE | re.UNICODE
@@ -242,33 +259,38 @@ class PasswordFinder:
                 w.nextline_mod,
             ),
             # 5. Delimited: keyword followed -- within a short window that may
-            #    cross one line wrap -- by a value the sender set off in
-            #    quotes/emphasis/brackets, with no explicit connector. Catches
-            #    natural-language sentences where the value sits a few words (or
-            #    a sentence) after the keyword, e.g. "please use the following
-            #    password to access the document(s). *Ab12Cd34*".
+            #    cross a line break (including one blank line, so a value set on
+            #    a paragraph of its own still counts) -- by a value the sender
+            #    set off in quotes/emphasis/brackets, with no explicit
+            #    connector. Catches natural-language sentences where the value
+            #    sits a few words (or a sentence) after the keyword, e.g.
+            #    "please use the following password to access the document(s).
+            #    *Ab12Cd34*".
             (
                 "delimited",
                 re.compile(
-                    r"\b(?P<keyword>%s)\b(?P<filler>[^\r\n]{0,48}?(?:\r?\n[^\r\n]{0,48}?)?)"
-                    r"(?P<pw>%s)" % (kw, _DELIMITED_VALUE),
+                    r"\b(?P<keyword>%s)\b%s(?P<pw>%s)"
+                    % (kw, filler(48), _DELIMITED_VALUE),
                     flags,
                 ),
                 w.delimited_mod,
             ),
             # 6. Proximity: keyword followed -- within a short window that may
-            #    cross one line wrap -- by a bare, undelimited token that is
-            #    strongly password-shaped (contains BOTH a letter and a digit).
-            #    A last-resort fallback for natural-language sentences with no
-            #    connector and no delimiter, e.g. "please use the following
-            #    password to access the file(s). KRVBs699gqp3xeaq Please
-            #    note ...". Requiring a letter AND a digit keeps prose words
-            #    (which never mix the two) from matching.
+            #    cross a line break (including one blank line) -- by a bare,
+            #    undelimited token that is strongly password-shaped (contains
+            #    BOTH a letter and a digit). A last-resort fallback for
+            #    natural-language sentences with no connector and no delimiter,
+            #    e.g. "please use the following password to access the file(s).
+            #
+            #    KRVBs699gqp3xeaq
+            #
+            #    Please note ...". Requiring a letter AND a digit keeps prose
+            #    words (which never mix the two) from matching.
             (
                 "proximity",
                 re.compile(
-                    r"\b(?P<keyword>%s)\b(?P<filler>[^\r\n]{0,40}?(?:\r?\n[^\r\n]{0,40}?)?)"
-                    r"(?P<pw>(?=\S*[A-Za-z])(?=\S*\d)\S{4,160})" % kw,
+                    r"\b(?P<keyword>%s)\b%s"
+                    r"(?P<pw>(?=\S*[A-Za-z])(?=\S*\d)\S{4,160})" % (kw, filler(40)),
                     flags,
                 ),
                 w.proximity_mod,
