@@ -124,6 +124,7 @@ finder = PasswordFinder(
     max_length=128,                      # ignore very long tokens (URLs etc.)
     extra_keywords=None,                 # add your own trigger words
     decode_html=True,                    # strip HTML before matching
+    extra_reject_tokens=None,            # never return these as a password
 )
 ```
 
@@ -146,6 +147,30 @@ finder = PasswordFinder(config=config)
 ```
 
 `extra_keywords` still works alongside a custom `config` (it merges on top).
+
+### Blacklisting words
+
+Some corpora keep throwing up the same wrong answer: a word that sits right
+after the keyword and reads like a password but never is. Pass those to
+`extra_reject_tokens` and they are never returned, however well they score:
+
+```python
+finder = PasswordFinder(extra_reject_tokens=["prompted", "accessible"])
+
+finder.find_passwords("The password is prompted")   # []
+finder.find_passwords("The password is Hunter2!")   # ["Hunter2!"]
+```
+
+Matching is case-insensitive and happens after trimming, so one entry covers
+`prompted`, `Prompted` and `prompted.` alike. These **merge with** the built-in
+`DEFAULT_REJECT_TOKENS` (`emailed`, `attached`, `reset`, …), so you keep the
+defaults; the equivalent on a config object is
+`FinderConfig().with_extra_reject_tokens([...])`. To replace the built-in list
+outright instead, set the field directly:
+`FinderConfig(reject_tokens=frozenset({...}))`.
+
+Note this only stops a word being returned *as a password*. It does not stop it
+acting as filler between the keyword and the real value.
 
 ## Command-line testing
 

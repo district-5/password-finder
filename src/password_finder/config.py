@@ -10,7 +10,7 @@ finder's ``config=`` argument.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import Mapping
+from typing import Iterable, Mapping
 
 __all__ = ["Weights", "FinderConfig", "DEFAULT_KEYWORDS", "DEFAULT_FILLER_WORDS", "DEFAULT_REJECT_TOKENS"]
 
@@ -171,3 +171,20 @@ class FinderConfig:
             if kw:
                 merged.setdefault(kw, score)
         return replace(self, keywords=merged)
+
+    def with_extra_reject_tokens(self, extra: Iterable[str]) -> "FinderConfig":
+        """Return a copy with additional never-a-password tokens merged in.
+
+        The counterpart to :meth:`with_extra_keywords`: use it to blacklist
+        words that keep being suggested as passwords for a particular corpus,
+        e.g. ``config.with_extra_reject_tokens(["prompted", "accessible"])``.
+        Tokens are compared case-insensitively, so the case given here does not
+        matter. Merging keeps :data:`DEFAULT_REJECT_TOKENS`; pass
+        ``reject_tokens=`` to the constructor instead to replace them wholesale.
+        """
+        merged = set(self.reject_tokens)
+        for token in extra:
+            token = str(token).strip().lower()
+            if token:
+                merged.add(token)
+        return replace(self, reject_tokens=frozenset(merged))

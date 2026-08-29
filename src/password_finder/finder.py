@@ -86,6 +86,7 @@ class PasswordFinder:
         extra_keywords: Iterable[str] | None = None,
         decode_html: bool = True,
         config: FinderConfig | None = None,
+        extra_reject_tokens: Iterable[str] | None = None,
     ) -> None:
         """
         :param min_length:     Passwords shorter than this (after trimming) are ignored.
@@ -97,11 +98,20 @@ class PasswordFinder:
                                callers never need to say which they are passing.
                                Set ``False`` to force plain-text handling.
         :param config:         Full :class:`FinderConfig` override (keywords, weights, ...).
-                               ``extra_keywords`` are merged on top of it.
+                               ``extra_keywords`` and ``extra_reject_tokens`` are
+                               merged on top of it.
+        :param extra_reject_tokens:
+                               Words to blacklist: never return these as a
+                               password, however well they score. Merged with
+                               :data:`~password_finder.DEFAULT_REJECT_TOKENS` and
+                               matched case-insensitively against the whole
+                               trimmed token, e.g. ``["prompted", "accessible"]``.
         """
         cfg = config if config is not None else FinderConfig()
         if extra_keywords:
             cfg = cfg.with_extra_keywords(list(extra_keywords))
+        if extra_reject_tokens:
+            cfg = cfg.with_extra_reject_tokens(extra_reject_tokens)
         self._cfg = cfg
 
         self._min_length = min_length

@@ -9,7 +9,13 @@ from __future__ import annotations
 import pytest
 
 import password_finder
-from password_finder import Candidate, FinderConfig, PasswordFinder, Weights
+from password_finder import (
+    DEFAULT_REJECT_TOKENS,
+    Candidate,
+    FinderConfig,
+    PasswordFinder,
+    Weights,
+)
 
 
 @pytest.fixture()
@@ -259,6 +265,67 @@ def test_extra_keywords_merge_onto_custom_config() -> None:
     finder = PasswordFinder(extra_keywords=["token"], config=config)
     assert finder.find_all("token: Hunter2")[0].password == "Hunter2"
     assert finder.find_all("magicword: Hunter2")[0].password == "Hunter2"
+
+
+# --------------------------------------------------------------------------- #
+# Blacklisting: words that must never be returned as a password.              #
+# --------------------------------------------------------------------------- #
+
+
+def test_extra_reject_tokens_blacklist_a_word() -> None:
+    text = "The password is prompted"
+
+    # Without the blacklist the word is happily returned...
+    assert PasswordFinder().find_all(text)[0].password == "prompted"
+
+    # ...and with it, nothing is found at all.
+    assert PasswordFinder(extra_reject_tokens=["prompted"]).find_all(text) == []
+
+
+def test_extra_reject_tokens_are_case_insensitive() -> None:
+    # Blacklist entry and text differ in case, and the value carries trailing
+    # sentence punctuation -- rejection happens after trimming, so it still bites.
+    finder = PasswordFinder(extra_reject_tokens=["Accessible"])
+    assert finder.find_all("The password is accessible.") == []
+    assert finder.find_all("The password is ACCESSIBLE") == []
+
+
+def test_extra_reject_tokens_keep_the_defaults() -> None:
+    finder = PasswordFinder(extra_reject_tokens=["prompted"])
+    # A default reject token still applies alongside the added one.
+    assert finder.find_all("The password will be emailed") == []
+    # ...and a real password is unaffected by either.
+    assert finder.find_all("The password is Hunter2!")[0].password == "Hunter2!"
+
+
+def test_extra_reject_tokens_merge_onto_custom_config() -> None:
+    config = FinderConfig(reject_tokens=frozenset({"widget"}))
+    finder = PasswordFinder(extra_reject_tokens=["prompted"], config=config)
+    assert finder.find_all("The password is widget") == []
+    assert finder.find_all("The password is prompted") == []
+
+
+def test_with_extra_reject_tokens_returns_a_merged_copy() -> None:
+    config = FinderConfig()
+    merged = config.with_extra_reject_tokens(["Prompted", " accessible ", ""])
+
+    assert {"prompted", "accessible"} <= merged.reject_tokens  # normalised
+    assert DEFAULT_REJECT_TOKENS <= merged.reject_tokens       # defaults kept
+    assert "" not in merged.reject_tokens                      # blanks dropped
+    assert config.reject_tokens == DEFAULT_REJECT_TOKENS        # original intact
+
+
+def test_reject_tokens_can_be_replaced_wholesale() -> None:
+    # Passing reject_tokens= (rather than merging) drops the defaults.
+    finder = PasswordFinder(config=FinderConfig(reject_tokens=frozenset({"prompted"})))
+    assert finder.find_all("The password is prompted") == []
+    assert finder.find_all("The password is emailed")[0].password == "emailed"
+
+
+def test_module_level_helper_accepts_extra_reject_tokens() -> None:
+    text = "The password is prompted"
+    assert password_finder.find_passwords(text) == ["prompted"]
+    assert password_finder.find_passwords(text, extra_reject_tokens=["prompted"]) == []
 
 
 # --------------------------------------------------------------------------- #
