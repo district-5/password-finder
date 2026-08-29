@@ -323,6 +323,45 @@ def test_reject_tokens_can_be_replaced_wholesale() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Ranking: stable and meaningful even when scores clamp to the ceiling.       #
+# --------------------------------------------------------------------------- #
+
+
+SATURATING_TEXT = (
+    "Password: Ab12Cd34 or passphrase: Xy98Zw76 or passcode: Qq11Rr22"
+)
+
+
+def test_reported_confidence_stays_within_bounds() -> None:
+    weights = Weights()
+    for c in PasswordFinder().find_all(SATURATING_TEXT):
+        assert weights.min_score <= c.confidence <= weights.max_score
+
+
+def test_ranking_is_deterministic() -> None:
+    # Several candidates clamp to the same reported confidence here; the order
+    # must still be reproducible rather than falling out of iteration order.
+    orders = {tuple(PasswordFinder().find_passwords(SATURATING_TEXT)) for _ in range(25)}
+    assert len(orders) == 1
+
+
+def test_clamped_candidates_are_ranked_by_underlying_score() -> None:
+    result = PasswordFinder().find_all(SATURATING_TEXT)
+
+    # All three saturate, so the reported numbers cannot separate them...
+    assert len({c.confidence for c in result}) == 1
+    # ...but the stronger keyword still sorts first.
+    assert result[0].keyword == "passphrase"
+
+
+def test_equal_scores_break_towards_the_earliest_mention() -> None:
+    text = "Passcode: Aa11Bb22. Passcode: Aa11Bb33."
+    result = PasswordFinder().find_all(text)
+    assert [c.password for c in result] == ["Aa11Bb22", "Aa11Bb33"]
+    assert result[0].offset < result[1].offset
+
+
+# --------------------------------------------------------------------------- #
 # Word-shaped tokens: downranked so a real password outranks them.            #
 # --------------------------------------------------------------------------- #
 

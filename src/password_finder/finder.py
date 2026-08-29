@@ -142,7 +142,9 @@ class PasswordFinder:
         if text == "":
             return []
 
-        by_password: dict[str, Candidate] = {}
+        # Keyed by password; the value carries the raw (unclamped) score used
+        # for ranking alongside the candidate that reports the clamped one.
+        by_password: dict[str, tuple[float, Candidate]] = {}
 
         for name, regex, mod in self._patterns:
             for m in regex.finditer(text):
@@ -159,24 +161,34 @@ class PasswordFinder:
                 gap = max(0, start - m.end("keyword"))
                 wrapped = raw_token[:1] in _OPENERS and raw_token != token
 
-                confidence = self._score(token, keyword, connector, filler, gap, wrapped, mod)
+                raw = self._raw_score(token, keyword, connector, filler, gap, wrapped, mod)
 
                 existing = by_password.get(token)
-                if existing is None or confidence > existing.confidence:
-                    by_password[token] = Candidate(
-                        password=token,
-                        confidence=confidence,
-                        keyword=keyword,
-                        context=self._context(text, start, len(raw_token)),
-                        offset=start,
-                        pattern=name,
-                        span=(start, start + len(raw_token)),
+                if existing is None or raw > existing[0]:
+                    by_password[token] = (
+                        raw,
+                        Candidate(
+                            password=token,
+                            confidence=self._clamp(raw),
+                            keyword=keyword,
+                            context=self._context(text, start, len(raw_token)),
+                            offset=start,
+                            pattern=name,
+                            span=(start, start + len(raw_token)),
+                        ),
                     )
 
-        candidates = list(by_password.values())
-        candidates.sort(key=lambda c: c.confidence, reverse=True)
+        # Rank on the raw score, not the reported one. Several candidates
+        # routinely clamp to the same ceiling, and ordering them by the clamped
+        # value would leave the winner decided by pattern iteration order.
+        # Remaining ties break towards the earliest mention, then the password
+        # itself, so the ranking is total and reproducible.
+        ranked = sorted(
+            by_password.values(),
+            key=lambda item: (-item[0], item[1].offset, item[1].password),
+        )
 
-        return candidates
+        return [candidate for _, candidate in ranked]
 
     def find_passwords(self, text: str) -> list[str]:
         """Return just the password strings, ranked by confidence (highest
@@ -482,7 +494,12 @@ class PasswordFinder:
                 return v
         return self._cfg.weights.default_keyword_score
 
-    def _score(
+    def _clamp(self, raw: float) -> float:
+        """Reported confidence: the raw score held inside the score bounds."""
+        w = self._cfg.weights
+        return max(w.min_score, min(w.max_score, round(raw, 3)))
+
+    def _raw_score(
         self,
         token: str,
         keyword: str,
@@ -492,6 +509,12 @@ class PasswordFinder:
         wrapped: bool,
         modifier: float,
     ) -> float:
+        """Heuristic score before clamping.
+
+        Left unclamped so ranking can still separate two candidates that both
+        sit above the reported ceiling; :meth:`_clamp` produces the number the
+        caller sees.
+        """
         w = self._cfg.weights
         score = self._base_score(keyword) + modifier
 
@@ -558,7 +581,7 @@ class PasswordFinder:
         if token.isdigit() and length >= w.reference_number_min_digits:
             score -= w.reference_number_penalty
 
-        return max(w.min_score, min(w.max_score, round(score, 3)))
+        return round(score, 3)
 
     def _context(self, text: str, offset: int, token_len: int) -> str:
         if offset < 0:
