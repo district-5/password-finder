@@ -323,6 +323,45 @@ def test_reject_tokens_can_be_replaced_wholesale() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Fragments: a truncation of a better match is not a second password.         #
+# --------------------------------------------------------------------------- #
+
+
+def _candidate(password: str, span: tuple[int, int]) -> Candidate:
+    return Candidate(
+        password=password,
+        confidence=0.9,
+        keyword="password",
+        context="",
+        offset=span[0],
+        pattern="strict",
+        span=span,
+    )
+
+
+def test_fragment_of_a_better_match_is_dropped() -> None:
+    ranked = [_candidate("Ab12 Cd34", (10, 21)), _candidate("Ab12", (10, 15))]
+    assert [c.password for c in PasswordFinder._drop_fragments(ranked)] == ["Ab12 Cd34"]
+
+
+def test_same_text_at_a_different_position_is_kept() -> None:
+    # A message really can repeat or carry two similar passwords; only an
+    # overlapping truncation is a fragment.
+    ranked = [_candidate("Ab12Cd34", (10, 18)), _candidate("Ab12", (40, 44))]
+    assert len(PasswordFinder._drop_fragments(ranked)) == 2
+
+
+def test_unrelated_candidates_are_all_kept() -> None:
+    ranked = [_candidate("Ab12Cd34", (10, 18)), _candidate("Xy98Zw76", (30, 38))]
+    assert len(PasswordFinder._drop_fragments(ranked)) == 2
+
+
+def test_two_similar_passwords_in_one_message_both_survive() -> None:
+    result = PasswordFinder().find_passwords("Password: Aa11Bb22 and password: Aa11Bb22x")
+    assert set(result) == {"Aa11Bb22", "Aa11Bb22x"}
+
+
+# --------------------------------------------------------------------------- #
 # Ranking: stable and meaningful even when scores clamp to the ceiling.       #
 # --------------------------------------------------------------------------- #
 

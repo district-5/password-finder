@@ -188,7 +188,32 @@ class PasswordFinder:
             key=lambda item: (-item[0], item[1].offset, item[1].password),
         )
 
-        return [candidate for _, candidate in ranked]
+        return self._drop_fragments([candidate for _, candidate in ranked])
+
+    @staticmethod
+    def _drop_fragments(ranked: list[Candidate]) -> list[Candidate]:
+        """Remove candidates that are a fragment of a better-ranked one.
+
+        Two patterns reading the same text can yield "Hunter2!" and "Hunter2",
+        which are not two passwords but one password and a truncation of it.
+        A candidate is dropped when a stronger candidate covers its position
+        and contains its text; anything at a different position survives,
+        because a message really can carry two similar passwords.
+        """
+        kept: list[Candidate] = []
+
+        for candidate in ranked:
+            start, end = candidate.span
+            fragment = any(
+                other.span[0] <= start
+                and end <= other.span[1]
+                and candidate.password in other.password
+                for other in kept
+            )
+            if not fragment:
+                kept.append(candidate)
+
+        return kept
 
     def find_passwords(self, text: str) -> list[str]:
         """Return just the password strings, ranked by confidence (highest
