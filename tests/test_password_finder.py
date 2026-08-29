@@ -323,6 +323,64 @@ def test_reject_tokens_can_be_replaced_wholesale() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Reply history: a password quoted from an earlier message is the weaker bet. #
+# --------------------------------------------------------------------------- #
+
+
+CURRENT = "Nn99Pp88"
+SUPERSEDED = "Oo11Qq22"
+
+
+@pytest.mark.parametrize(
+    "label,text",
+    [
+        (
+            "angle quoted lines",
+            "The new password is Nn99Pp88\n\n> Earlier you wrote:\n"
+            "> The password is Oo11Qq22\n",
+        ),
+        (
+            "original message separator",
+            "Here is the updated password: Nn99Pp88\n\n"
+            "-----Original Message-----\nFrom: someone\n\n"
+            "The password is Oo11Qq22\n",
+        ),
+        (
+            "on ... wrote",
+            "New password: Nn99Pp88\n\nOn 3 March 2026 at 09:12, A Person wrote:\n"
+            "The password is Oo11Qq22\n",
+        ),
+        (
+            "underscore rule",
+            "New password: Nn99Pp88\n\n________________________\n"
+            "The password is Oo11Qq22\n",
+        ),
+    ],
+)
+def test_quoted_history_ranks_below_the_current_message(label: str, text: str) -> None:
+    result = PasswordFinder().find_all(text)
+
+    assert result[0].password == CURRENT
+    # Still returned, just less convincing: the thread may only refer back to it.
+    assert SUPERSEDED in [c.password for c in result]
+    assert result[0].confidence > result[1].confidence
+
+
+def test_a_quoted_only_message_still_yields_its_password() -> None:
+    # Downranked, not discarded, so nothing is lost when the whole body is
+    # quoted history.
+    assert PasswordFinder().find_passwords("> The password is Oo11Qq22\n") == [SUPERSEDED]
+
+
+def test_quoted_history_penalty_is_configurable() -> None:
+    text = "> The password is Oo11Qq22\n"
+    config = FinderConfig(weights=Weights(quoted_history_penalty=0.0))
+    relaxed = PasswordFinder(config=config).find_all(text)[0]
+    default = PasswordFinder().find_all(text)[0]
+    assert relaxed.confidence > default.confidence
+
+
+# --------------------------------------------------------------------------- #
 # Quoted values may contain spaces: a passphrase is still one password.       #
 # --------------------------------------------------------------------------- #
 

@@ -63,6 +63,19 @@ _INVISIBLE_RE = re.compile(
 # Unicode line separators are line breaks, not token characters.
 _LINE_SEPARATOR_RE = re.compile("[\u2028\u2029]")
 
+# Quoted reply history: lines a mail client prefixed with ">", and everything
+# following a reply separator. A password quoted from an earlier message is
+# usually the superseded one, so matches inside these regions are downranked.
+_QUOTED_LINE_RE = re.compile(r"(?m)^[ \t]*>.*$")
+_REPLY_SEPARATOR_RE = re.compile(
+    r"(?im)^[ \t]*(?:"
+    r"-{2,}\s*(?:original message|forwarded message|reply above this line)\s*-{2,}"
+    r"|_{5,}"
+    r"|(?:on\s.{0,120}?\swrote:)"
+    r"|(?:from|sent|to|subject):\s.{0,200}$(?=(?:\r?\n[ \t]*(?:from|sent|to|subject):))"
+    r")"
+)
+
 # Used to decide, automatically, whether a string is HTML: a tag-shaped run, or
 # an HTML entity (named, decimal, or hex).
 _HTML_TAG_RE = re.compile(r"<\s*[a-z!/][^>]*>", re.IGNORECASE)
@@ -153,6 +166,8 @@ class PasswordFinder:
         if text == "":
             return []
 
+        quoted = self._quoted_regions(text)
+
         # Keyed by password; the value carries the raw (unclamped) score used
         # for ranking alongside the candidate that reports the clamped one.
         by_password: dict[str, tuple[float, Candidate]] = {}
@@ -172,7 +187,11 @@ class PasswordFinder:
                 gap = max(0, start - m.end("keyword"))
                 wrapped = raw_token[:1] in _OPENERS and raw_token != token
 
-                raw = self._raw_score(token, keyword, connector, filler, gap, wrapped, mod)
+                in_history = any(lo <= start < hi for lo, hi in quoted)
+
+                raw = self._raw_score(
+                    token, keyword, connector, filler, gap, wrapped, mod, in_history
+                )
 
                 existing = by_password.get(token)
                 if existing is None or raw > existing[0]:
@@ -200,6 +219,22 @@ class PasswordFinder:
         )
 
         return self._drop_fragments([candidate for _, candidate in ranked])
+
+    @staticmethod
+    def _quoted_regions(text: str) -> list[tuple[int, int]]:
+        """Character ranges holding quoted reply history.
+
+        Covers ">"-prefixed lines and everything from the first reply separator
+        ("-----Original Message-----", "On <date> <person> wrote:", a run of
+        underscores, or a repeated header block) to the end of the message.
+        """
+        regions = [m.span() for m in _QUOTED_LINE_RE.finditer(text)]
+
+        separator = _REPLY_SEPARATOR_RE.search(text)
+        if separator is not None:
+            regions.append((separator.start(), len(text)))
+
+        return regions
 
     @staticmethod
     def _covers(outer: Candidate, inner: Candidate) -> bool:
@@ -564,6 +599,7 @@ class PasswordFinder:
         gap: int,
         wrapped: bool,
         modifier: float,
+        in_history: bool = False,
     ) -> float:
         """Heuristic score before clamping.
 
@@ -636,6 +672,13 @@ class PasswordFinder:
         # A long pure-digit run is much more likely a reference/policy number.
         if token.isdigit() and length >= w.reference_number_min_digits:
             score -= w.reference_number_penalty
+
+        # Quoted from an earlier message in the thread. Downranked rather than
+        # discarded: the current message may only refer back to it, in which
+        # case the quoted one is still the answer, just a weaker bet than
+        # anything stated afresh.
+        if in_history:
+            score -= w.quoted_history_penalty
 
         return round(score, 3)
 

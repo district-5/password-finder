@@ -179,6 +179,7 @@ class Weights:
     entropy_cap: float = 4.0
     lowercase_word_penalty: float = 0.08  # looks like a plain dictionary word
     dictionary_word_penalty: float = 0.30  # a known ordinary word (see below)
+    quoted_history_penalty: float = 0.20   # found in quoted reply history
     wrapped_value_bonus: float = 0.08   # value was quoted/bracketed (deliberate)
     reference_number_penalty: float = 0.25  # long pure-digit run (ref/policy no.)
     reference_number_min_digits: int = 11
