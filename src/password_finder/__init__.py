@@ -16,6 +16,7 @@ from .config import (
     FinderConfig,
     Weights,
 )
+from .email_body import extract_body, looks_like_email
 from .finder import PasswordFinder, find_all, find_passwords
 
 __all__ = [
@@ -28,6 +29,8 @@ __all__ = [
     "DEFAULT_REJECT_TOKENS",
     "find_passwords",
     "find_all",
+    "extract_body",
+    "looks_like_email",
 ]
 
 # Single source of truth is the "version" field in pyproject.toml, read back

@@ -15,6 +15,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from .email_body import extract_body
 from .finder import PasswordFinder
 
 
@@ -27,7 +28,8 @@ def find_password(argv: list[str] | None = None) -> int:
     else:
         text = sys.stdin.read()
 
-    candidates = PasswordFinder().find_all(text)
+    # A raw message is decoded first; a plain body passes through untouched.
+    candidates = PasswordFinder().find_all(extract_body(text))
 
     if not candidates:
         print("No password found.", file=sys.stderr)
@@ -55,7 +57,7 @@ def scan_emails(argv: list[str] | None = None) -> int:
             continue
 
         text = file.read_text(encoding="utf-8", errors="replace")
-        candidates = finder.find_all(text)
+        candidates = finder.find_all(extract_body(text))
 
         print(f"\n=== {file.name} ===")
 

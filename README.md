@@ -172,6 +172,27 @@ outright instead, set the field directly:
 Note this only stops a word being returned *as a password*. It does not stop it
 acting as filler between the keyword and the real value.
 
+## Raw email messages
+
+The finder expects a **body**. A raw `.eml` file is not one: quoted-printable
+rewrites `=` as `=3D` and breaks long lines with a trailing `=`, base64 hides
+the text completely, and a multipart message carries several bodies at once.
+Matching against any of that produces a confidently wrong answer.
+
+`extract_body` turns a message into something worth matching, and hands back
+anything that is not a message untouched, so it is always safe to call:
+
+```python
+from password_finder import extract_body, find_passwords
+
+find_passwords(open("message.eml").read())                 # ['is=3D'] - wrong
+find_passwords(extract_body(open("message.eml").read()))   # ['Ab12Cd34']
+```
+
+Quoted-printable and base64 are decoded, the declared charset is applied, and
+multipart messages give up their text part (falling back to the HTML one when
+the plain part is an empty stub). The `find-password` CLI does this for you.
+
 ## Command-line testing
 
 Two helpers are installed with the package for trying the library against real
