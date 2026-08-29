@@ -533,11 +533,21 @@ class PasswordFinder:
         # Randomness: a high-entropy token looks generated, not typed.
         score += w.entropy_scale * min(w.entropy_cap, _entropy(token))
 
-        # Looks like a plain dictionary word: all letters, one case (e.g.
-        # "password", "CASE", "SENSITIVE"). Mildly penalise. Mixed-case alpha
-        # (e.g. "aTlKeiEa") is left alone -- it does not read as a word.
-        if length > 3 and token.isalpha() and (token.islower() or token.isupper()):
+        # Looks like a plain dictionary word: all letters in a single case
+        # ("password", "CASE") or capitalised as a sentence starts ("Prompted").
+        # Title case matters because that is exactly how an ordinary word
+        # appears just after a keyword: "The password is Prompted". Mixed-case
+        # alpha (e.g. "aTlKeiEa") is left alone -- it does not read as a word.
+        if length > 3 and token.isalpha() and (
+            token.islower() or token.isupper() or token.istitle()
+        ):
             score -= w.lowercase_word_penalty
+
+        # A known ordinary word from this genre of message. Downranked rather
+        # than rejected, since any of them could genuinely be a password, but
+        # a real one in the same message should outrank it.
+        if token.lower() in self._cfg.dictionary_words:
+            score -= w.dictionary_word_penalty
 
         # A deliberately quoted/bracketed value is a strong "this exact string"
         # signal from the sender.

@@ -12,7 +12,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import Iterable, Mapping
 
-__all__ = ["Weights", "FinderConfig", "DEFAULT_KEYWORDS", "DEFAULT_FILLER_WORDS", "DEFAULT_REJECT_TOKENS"]
+__all__ = [
+    "Weights",
+    "FinderConfig",
+    "DEFAULT_KEYWORDS",
+    "DEFAULT_FILLER_WORDS",
+    "DEFAULT_REJECT_TOKENS",
+    "DEFAULT_DICTIONARY_WORDS",
+]
 
 
 #: Keyword => base confidence (0.0 - 1.0).
@@ -108,6 +115,33 @@ DEFAULT_REJECT_TOKENS: frozenset[str] = frozenset({
 })
 
 
+#: Ordinary English words that turn up immediately after a password keyword in
+#: delivery emails ("the password is prompted for on opening"). Unlike
+#: :data:`DEFAULT_REJECT_TOKENS` these are not banned outright, because any of
+#: them could legitimately be somebody's password; they are merely downranked,
+#: so a real password in the same message outranks them.
+#:
+#: Kept deliberately small and specific to this genre of message rather than a
+#: general dictionary: a broad word list would penalise passphrases.
+DEFAULT_DICTIONARY_WORDS: frozenset[str] = frozenset({
+    # Instructions that follow the value in "how to open it" paragraphs.
+    "prompted", "prompt", "prompts", "asked", "requested", "recommend",
+    "recommended", "note", "notice", "noted", "please", "kindly", "copy",
+    "paste", "type", "typing", "input", "insert", "select", "choose",
+    "opening", "accessing", "unlocking", "viewing", "reading",
+    # Descriptions of the password itself.
+    "accessible", "readable", "unique", "random", "temporary", "personal",
+    "confidential", "sensitive", "secure", "different", "correct", "valid",
+    "identical", "lowercase", "uppercase", "alphanumeric", "characters",
+    "letters", "numbers", "digits", "characters", "combination",
+    # Generic connective prose.
+    "available", "further", "additional", "another", "certain", "specific",
+    "relevant", "necessary", "appropriate", "successful", "complete",
+    "completed", "remember", "forget", "receive", "received", "contact",
+    "question", "questions", "detail", "details", "reference", "account",
+})
+
+
 @dataclass(frozen=True)
 class Weights:
     """Every numeric knob in the scoring function.
@@ -144,6 +178,7 @@ class Weights:
     entropy_scale: float = 0.02         # * Shannon entropy (bits), capped
     entropy_cap: float = 4.0
     lowercase_word_penalty: float = 0.08  # looks like a plain dictionary word
+    dictionary_word_penalty: float = 0.30  # a known ordinary word (see below)
     wrapped_value_bonus: float = 0.08   # value was quoted/bracketed (deliberate)
     reference_number_penalty: float = 0.25  # long pure-digit run (ref/policy no.)
     reference_number_min_digits: int = 11
@@ -161,6 +196,7 @@ class FinderConfig:
     keywords: Mapping[str, float] = field(default_factory=lambda: dict(DEFAULT_KEYWORDS))
     filler_words: tuple[str, ...] = DEFAULT_FILLER_WORDS
     reject_tokens: frozenset[str] = DEFAULT_REJECT_TOKENS
+    dictionary_words: frozenset[str] = DEFAULT_DICTIONARY_WORDS
     weights: Weights = field(default_factory=Weights)
 
     def with_extra_keywords(self, extra: list[str], score: float = 0.6) -> "FinderConfig":

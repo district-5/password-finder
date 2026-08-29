@@ -323,6 +323,51 @@ def test_reject_tokens_can_be_replaced_wholesale() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Word-shaped tokens: downranked so a real password outranks them.            #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The password is prompted",       # lower case
+        "The password is Prompted",       # capitalised, as a sentence starts
+        "The password is PROMPTED",       # upper case
+        "Your passcode is Accessible",
+    ],
+)
+def test_ordinary_words_score_below_the_useful_threshold(text: str) -> None:
+    # A capitalised word used to score the maximum, because the single-case
+    # test missed title case. Nothing word-shaped should look convincing.
+    candidates = PasswordFinder().find_all(text)
+    assert all(c.confidence < 0.7 for c in candidates), [
+        (c.password, c.confidence) for c in candidates
+    ]
+
+
+def test_real_password_outranks_a_word_in_the_same_message() -> None:
+    text = "The password is Prompted. Sorry, the password is Kp7mXq2!"
+    result = PasswordFinder().find_all(text)
+    assert result[0].password == "Kp7mXq2!"
+    assert result[0].confidence > result[1].confidence
+
+
+def test_mixed_case_alpha_password_is_not_penalised() -> None:
+    # "aTlKeiEa" does not read as a word, so neither penalty should apply.
+    plain = PasswordFinder().find_all("Your pin is aTlKeiEa")[0]
+    worded = PasswordFinder().find_all("Your pin is Prompted")[0]
+    assert plain.confidence > worded.confidence
+
+
+def test_dictionary_words_are_configurable() -> None:
+    # Downranking is a soft signal, so it can be turned off entirely.
+    config = FinderConfig(dictionary_words=frozenset())
+    relaxed = PasswordFinder(config=config).find_all("The password is prompted")[0]
+    default = PasswordFinder().find_all("The password is prompted")[0]
+    assert relaxed.confidence > default.confidence
+
+
+# --------------------------------------------------------------------------- #
 # Invisible characters: never part of a password, stripped before matching.   #
 # --------------------------------------------------------------------------- #
 
