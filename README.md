@@ -88,8 +88,15 @@ that follows. It matches six layouts:
    letters *and* digits sitting close to the keyword.
 
 Values wrapped in quotes, `*markdown*`, `` `backticks` `` or `(brackets)` are
-unwrapped automatically. The matching `pattern` and character `span` are exposed
-on each `Candidate` for debugging.
+unwrapped automatically. A quoted value may contain spaces, so a passphrase such
+as `"correct horse battery staple"` comes back whole rather than truncated at
+the first space. The matching `pattern` and character `span` are exposed on each
+`Candidate` for debugging.
+
+Characters that render as nothing are removed before matching: zero-width
+spaces and joiners, bidi controls, soft hyphens and byte-order marks. Mail
+clients emit these routinely, and left in place they produce a password that
+looks correct on screen and fails when pasted.
 
 Each hit is scored heuristically. Signals that raise confidence:
 
@@ -104,15 +111,46 @@ Signals that lower it, or reject the match outright:
 
 - lots of filler words / large distance between the keyword and the value,
 - the "password" being a plain word like `attached`, `below`, `reset`, or `is`,
+- the value being an ordinary word, in any capitalisation (`prompted`,
+  `Prompted`, `PROMPTED`), which reads like prose rather than a secret,
+- the value sitting in **quoted reply history** (a `>` line, or anything below
+  `-----Original Message-----` or `On ... wrote:`), since a password quoted from
+  an earlier message has usually been superseded. It is downranked rather than
+  discarded, so nothing is lost when the whole body is quoted history,
 - a passive-delivery phrase such as *"a password will be emailed to you"*, where
   no password is actually present (`emailed`, `issued`, `sent`, … are rejected),
 - a long pure-digit run (looks like a reference/policy number),
 - shapes that are **never** passwords: URLs, email addresses, phone numbers,
   dates, times, and currency amounts — these are rejected outright.
 
+Candidates that are a truncation of a better match at the same position are
+dropped: `"Ab12 Cd34"` and `Ab12` are one password and a fragment of it, not two
+passwords. Two similar passwords at *different* positions are both kept.
+
 This means when a message contains several candidates, the most plausible one
-sorts to the top. Because it is heuristic, always sanity-check
-`.confidence` for your use case rather than trusting the top hit blindly.
+sorts to the top. Ranking is total and reproducible: scores frequently reach the
+reported ceiling, so ties are settled on the underlying score and then on the
+earliest mention rather than on match order. Because it is heuristic, always
+sanity-check `.confidence` for your use case rather than trusting the top hit
+blindly.
+
+### Handling secrets
+
+A `Candidate` holds a live secret, so its `repr` masks both the password and the
+`context` snippet that quotes the surrounding message:
+
+```python
+c = finder.find_all("The password is Hunter2!")[0]
+
+repr(c)        # "Candidate(password=<8 chars>, ..., context=<25 chars>, ...)"
+print([c])     # masked too, so logging a result list leaks nothing
+c.password     # "Hunter2!" - explicit access is unchanged
+str(c)         # "Hunter2!"
+c.to_dict()    # carries the real values
+```
+
+This makes leaking a password through a log line, traceback or test failure
+something you have to opt into rather than something that happens by default.
 
 ## Configuration
 

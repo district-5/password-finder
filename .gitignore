@@ -13,6 +13,7 @@ env/
 
 # Test / tooling caches
 .pytest_cache/
+.hypothesis/
 .mypy_cache/
 .ruff_cache/
 .coverage
