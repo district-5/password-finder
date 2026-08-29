@@ -322,6 +322,55 @@ def test_reject_tokens_can_be_replaced_wholesale() -> None:
     assert finder.find_all("The password is emailed")[0].password == "emailed"
 
 
+# --------------------------------------------------------------------------- #
+# Invisible characters: never part of a password, stripped before matching.   #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "label,text",
+    [
+        ("zero width space", "The password is Ab12\u200bCd34"),
+        ("zero width non-joiner", "The password is Ab12\u200cCd34"),
+        ("soft hyphen", "The password is Ab12\u00adCd34"),
+        ("left-to-right mark", "The password is Ab12\u200eCd34"),
+        ("bidi override", "The password is Ab12\u202dCd34"),
+        ("word joiner", "The password is Ab12\u2060Cd34"),
+        ("byte order mark", "The password is Ab12\ufeffCd34"),
+    ],
+)
+def test_invisible_characters_are_stripped(label: str, text: str) -> None:
+    # Without stripping these survive into the token, giving a password that
+    # looks correct on screen and fails when pasted.
+    assert PasswordFinder().find_passwords(text) == ["Ab12Cd34"]
+
+
+def test_invisible_html_entity_is_stripped() -> None:
+    # Decoded to U+200B by html.unescape, so stripping has to run afterwards.
+    html_body = "<p>The password is Ab12&#8203;Cd34</p>"
+    assert PasswordFinder().find_passwords(html_body) == ["Ab12Cd34"]
+
+
+def test_invisible_characters_are_stripped_from_plain_text_too() -> None:
+    # Stripping is independent of HTML decoding, so it still applies when
+    # decoding is turned off.
+    finder = PasswordFinder(decode_html=False)
+    assert finder.find_passwords("The password is Ab12\u200bCd34") == ["Ab12Cd34"]
+
+
+def test_non_breaking_space_acts_as_a_separator() -> None:
+    # A non-breaking space is layout, not password content: it separates the
+    # connector from the value rather than being captured inside it.
+    finder = PasswordFinder()
+    assert finder.find_passwords("Password:\u00a0Ab12Cd34") == ["Ab12Cd34"]
+    assert finder.find_passwords("The password is Ab12\u00a0Cd34") == ["Ab12"]
+
+
+def test_unicode_line_separator_becomes_a_line_break() -> None:
+    # U+2028 is a line break, so this is the "value on the next line" layout.
+    assert PasswordFinder().find_passwords("Password\u2028Ab12Cd34") == ["Ab12Cd34"]
+
+
 def test_module_level_helper_accepts_extra_reject_tokens() -> None:
     text = "The password is prompted"
     assert password_finder.find_passwords(text) == ["prompted"]

@@ -41,6 +41,17 @@ _DELIMITED_VALUE = (
     r'|‘[^’\s]{2,160}’'
 )
 
+# Characters that render as nothing but survive into a captured token, giving a
+# password that looks right on screen and pastes wrong: the soft hyphen, the
+# zero-width space/joiner family, bidi controls, and the byte-order mark. Mail
+# clients emit these routinely (often as "&shy;" or "&zwnj;"), and they are
+# never part of a password, so they are removed before matching.
+_INVISIBLE_RE = re.compile(
+    "[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]"
+)
+# Unicode line separators are line breaks, not token characters.
+_LINE_SEPARATOR_RE = re.compile("[\u2028\u2029]")
+
 # Used to decide, automatically, whether a string is HTML: a tag-shaped run, or
 # an HTML entity (named, decimal, or hex).
 _HTML_TAG_RE = re.compile(r"<\s*[a-z!/][^>]*>", re.IGNORECASE)
@@ -317,16 +328,38 @@ class PasswordFinder:
         return bool(_HTML_TAG_RE.search(text) or _HTML_ENTITY_RE.search(text))
 
     def _normalise(self, text: str) -> str:
-        """Turn an HTML body into plain text so keyword matching works. No-op
-        when the text does not look like HTML, or when decoding is disabled.
+        """Prepare a body for matching.
+
+        HTML is turned into plain text so keyword matching works (skipped when
+        the text does not look like HTML, or when decoding is disabled).
+        Invisible characters are then stripped from whatever remains, including
+        plain text, since they are never part of a password and would otherwise
+        be captured inside one.
         """
-        if text == "" or not self._decode_html:
+        if text == "":
             return text
 
         # Automatically decide whether this string is HTML; leave plain text be.
-        if not self.looks_like_html(text):
-            return text
+        if self._decode_html and self.looks_like_html(text):
+            text = self._strip_html(text)
 
+        return self._strip_invisible(text)
+
+    @staticmethod
+    def _strip_invisible(text: str) -> str:
+        """Remove zero-width/bidi characters and normalise exotic whitespace.
+
+        Runs after entity decoding so an escaped "&#8203;" is caught too. A
+        non-breaking space becomes an ordinary one: it is a separator wherever
+        it appears, and the patterns match plain spaces.
+        """
+        text = _INVISIBLE_RE.sub("", text)
+        text = _LINE_SEPARATOR_RE.sub("\n", text)
+        return text.replace("\u00a0", " ")
+
+    @staticmethod
+    def _strip_html(text: str) -> str:
+        """Turn an HTML body into plain text, keeping layout as line breaks."""
         # Drop <script>/<style> blocks (and HTML comments) entirely -- their
         # content is never body text and would otherwise leak CSS/JS noise.
         text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
