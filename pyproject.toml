@@ -19,7 +19,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "hypothesis>=6,<7"]
 
 [project.scripts]
 find-password = "password_finder.cli:find_password"
