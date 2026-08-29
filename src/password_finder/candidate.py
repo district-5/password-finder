@@ -5,7 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
+def _mask(secret: str) -> str:
+    """Render a secret as its length only, revealing nothing about the value."""
+    return f"<{len(secret)} chars>"
+
+
+@dataclass(frozen=True, repr=False)
 class Candidate:
     """A single password candidate extracted from a body of text.
 
@@ -30,6 +35,21 @@ class Candidate:
     offset: int
     pattern: str = ""
     span: tuple[int, int] = (-1, -1)
+
+    def __repr__(self) -> str:
+        """Masked representation.
+
+        A candidate holds a live secret, and ``repr`` is what ends up in log
+        lines, tracebacks and test failure output, none of which should carry
+        it. ``context`` is masked too: it quotes the surrounding message. Reach
+        for :attr:`password` or :meth:`to_dict` to get the real values.
+        """
+        return (
+            f"Candidate(password={_mask(self.password)}, "
+            f"confidence={self.confidence!r}, keyword={self.keyword!r}, "
+            f"context={_mask(self.context)}, offset={self.offset!r}, "
+            f"pattern={self.pattern!r}, span={self.span!r})"
+        )
 
     def __str__(self) -> str:
         return self.password

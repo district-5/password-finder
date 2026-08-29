@@ -323,6 +323,48 @@ def test_reject_tokens_can_be_replaced_wholesale() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Secret hygiene: repr is what leaks into logs, so it must not carry the value.#
+# --------------------------------------------------------------------------- #
+
+
+def test_repr_does_not_expose_the_password(finder: PasswordFinder) -> None:
+    c = finder.find_all("The password is Hunter2!")[0]
+
+    assert "Hunter2!" not in repr(c)
+    assert "<8 chars>" in repr(c)
+
+
+def test_repr_does_not_expose_the_surrounding_message(finder: PasswordFinder) -> None:
+    # context quotes the message around the secret, so it is masked as well.
+    c = finder.find_all("Invoice 41 attached. The password is Hunter2!")[0]
+
+    assert "Invoice 41" not in repr(c)
+
+
+def test_containers_do_not_leak_the_password(finder: PasswordFinder) -> None:
+    # The usual accidental leak: logging or asserting on the whole result list.
+    result = finder.find_all("The password is Hunter2!")
+
+    assert "Hunter2!" not in repr(result)
+    assert "Hunter2!" not in f"{result}"
+
+
+def test_explicit_access_still_returns_the_real_value(finder: PasswordFinder) -> None:
+    c = finder.find_all("The password is Hunter2!")[0]
+
+    assert c.password == "Hunter2!"
+    assert str(c) == "Hunter2!"
+    assert c.to_dict()["password"] == "Hunter2!"
+
+
+def test_masking_does_not_affect_equality(finder: PasswordFinder) -> None:
+    a = finder.find_all("The password is Hunter2!")[0]
+    b = finder.find_all("The password is Hunter2!")[0]
+
+    assert a == b
+
+
+# --------------------------------------------------------------------------- #
 # Reply history: a password quoted from an earlier message is the weaker bet. #
 # --------------------------------------------------------------------------- #
 
