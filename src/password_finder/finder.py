@@ -26,19 +26,30 @@ _DOMAIN_RE = re.compile(r"(?i)[a-z0-9\-]{2,}\.[a-z]{2,}(?:/|$)")
 
 _OPENERS = frozenset('"\'“‘*`([{<')
 
+# Patterns whose match is bounded by delimiters the sender wrote, so the extent
+# of the value is stated rather than inferred. Only these may override a
+# better-scoring but narrower match (see PasswordFinder._drop_fragments).
+_STATED_EXTENT_PATTERNS = frozenset({"delimited", "wrapped"})
+
 # Matching delimiter pairs for the "delimited" pattern: a value the sender set
 # off in quotes / emphasis / brackets. Inner length >= 2 so junk like the "(s)"
 # in "document(s)" is skipped in favour of the real value further along.
+#
+# Quote-like delimiters allow inner spaces, because a quoted value states its
+# own extent and passphrases legitimately contain them ("correct horse battery
+# staple"). The match is lazy so it stops at the first closing quote rather
+# than swallowing the rest of the line. Brackets keep the no-space rule: they
+# wrap ordinary prose ("(see below)") far more often than they wrap a value.
 _DELIMITED_VALUE = (
-    r'\*[^*\s]{2,160}\*'
-    r'|"[^"\s]{2,160}"'
-    r"|'[^'\s]{2,160}'"
-    r'|`[^`\s]{2,160}`'
+    r'\*[^*\r\n]{2,160}?\*'
+    r'|"[^"\r\n]{2,160}?"'
+    r"|'[^'\r\n]{2,160}?'"
+    r'|`[^`\r\n]{2,160}?`'
     r'|\([^)\s]{2,160}\)'
     r'|\[[^\]\s]{2,160}\]'
     r'|\{[^}\s]{2,160}\}'
-    r'|“[^”\s]{2,160}”'
-    r'|‘[^’\s]{2,160}’'
+    r'|“[^”\r\n]{2,160}?”'
+    r'|‘[^’\r\n]{2,160}?’'
 )
 
 # Characters that render as nothing but survive into a captured token, giving a
@@ -191,27 +202,47 @@ class PasswordFinder:
         return self._drop_fragments([candidate for _, candidate in ranked])
 
     @staticmethod
-    def _drop_fragments(ranked: list[Candidate]) -> list[Candidate]:
-        """Remove candidates that are a fragment of a better-ranked one.
+    def _covers(outer: Candidate, inner: Candidate) -> bool:
+        """True when ``inner`` is a truncation of ``outer`` at the same place."""
+        return (
+            outer.span[0] <= inner.span[0]
+            and inner.span[1] <= outer.span[1]
+            and inner.password != outer.password
+            and inner.password in outer.password
+        )
 
-        Two patterns reading the same text can yield "Hunter2!" and "Hunter2",
-        which are not two passwords but one password and a truncation of it.
-        A candidate is dropped when a stronger candidate covers its position
-        and contains its text; anything at a different position survives,
-        because a message really can carry two similar passwords.
+    @classmethod
+    def _drop_fragments(cls, ranked: list[Candidate]) -> list[Candidate]:
+        """Remove candidates that are a truncation of another at the same place.
+
+        Two patterns reading the same text can yield "Ab12 Cd34" and "Ab12",
+        which are not two passwords but one password and a fragment of it. The
+        The better-scoring candidate normally wins. The exception is a match
+        whose extent the sender stated with delimiters: a quoted "Ab12 Cd34"
+        overrides a higher-scoring "Ab12" from a pattern that stopped at the
+        first space, and takes over its position in the ranking. An inferred
+        extent gets no such privilege, so a stray connector character swept up
+        by a loose match cannot displace the clean token beside it.
+
+        Candidates at a different position always survive: a message really can
+        carry two similar passwords, or repeat one.
         """
         kept: list[Candidate] = []
 
         for candidate in ranked:
-            start, end = candidate.span
-            fragment = any(
-                other.span[0] <= start
-                and end <= other.span[1]
-                and candidate.password in other.password
-                for other in kept
-            )
-            if not fragment:
+            if any(cls._covers(other, candidate) for other in kept):
+                continue
+
+            superseded = None
+            if candidate.pattern in _STATED_EXTENT_PATTERNS:
+                superseded = next(
+                    (i for i, other in enumerate(kept) if cls._covers(candidate, other)),
+                    None,
+                )
+            if superseded is None:
                 kept.append(candidate)
+            else:
+                kept[superseded] = candidate
 
         return kept
 

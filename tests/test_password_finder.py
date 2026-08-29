@@ -323,6 +323,51 @@ def test_reject_tokens_can_be_replaced_wholesale() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Quoted values may contain spaces: a passphrase is still one password.       #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ('The password is "correct horse battery staple"', "correct horse battery staple"),
+        ("The passphrase is 'open the blue door'", "open the blue door"),
+        ("Your password is *two words here*", "two words here"),
+        ("The password is \u201csmart quoted phrase\u201d", "smart quoted phrase"),
+        ("The password is `two tokens`", "two tokens"),
+    ],
+)
+def test_quoted_value_may_contain_spaces(text: str, expected: str) -> None:
+    assert PasswordFinder().find_all(text)[0].password == expected
+
+
+def test_quoted_value_stops_at_the_closing_quote() -> None:
+    # The match is lazy, so it must not run on to a later quote on the line.
+    text = 'The password is "Ab12 Cd34" and the file is "report.pdf"'
+    assert PasswordFinder().find_all(text)[0].password == "Ab12 Cd34"
+
+
+def test_stated_extent_beats_a_higher_scoring_fragment() -> None:
+    # A pattern stopping at the first space yields "Ab12"; the quotes say the
+    # value is wider, so the quoted extent wins the top spot.
+    result = PasswordFinder().find_passwords('The password is "Ab12 Cd34"')
+    assert result[0] == "Ab12 Cd34"
+
+
+def test_brackets_still_reject_prose() -> None:
+    # Brackets wrap ordinary prose far more often than they wrap a value, so
+    # they keep the no-space rule and the real password still wins.
+    result = PasswordFinder().find_all("The password (case sensitive) is Kp7mXq2")
+    assert result[0].password == "Kp7mXq2"
+
+
+def test_inferred_extent_cannot_displace_a_clean_token() -> None:
+    # A loose match can sweep up the connector ("=Zx9$kLm"); that is an
+    # inferred extent, so it must not displace the clean token beside it.
+    assert PasswordFinder().find_all("pwd=Zx9$kLm")[0].password == "Zx9$kLm"
+
+
+# --------------------------------------------------------------------------- #
 # Fragments: a truncation of a better match is not a second password.         #
 # --------------------------------------------------------------------------- #
 
