@@ -17,6 +17,16 @@ Requires Python 3.9+. It has no runtime dependencies (standard library only).
 
 ## What's new
 
+### 2.4.2
+
+- **A dot no longer makes a password a domain.** Rejecting any `label.letters`
+  tail lost real passwords silently, so `Kp7.Rnx` came back empty. Only a suffix
+  people actually write counts now, whether a top-level domain or the extension
+  of an attached file. URLs, domains and file names are still rejected.
+- **Angle brackets work in plain text.** `Zr8<Mk4>` used to make the whole
+  message look like markup, and the "tag" was stripped out of the middle of the
+  password. HTML is now recognised by real tag names.
+
 ### 2.4.1
 
 - **Ranking fix.** When a value whose extent the sender delimited replaced a
