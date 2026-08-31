@@ -17,7 +17,7 @@ Requires Python 3.9+. It has no runtime dependencies (standard library only).
 
 ## What's new
 
-### Unreleased
+### 2.4.0
 
 - **Wrapped sentences and paragraph gaps.** A value set apart in its own
   paragraph is found even when the sentence introducing it was wrapped by the
