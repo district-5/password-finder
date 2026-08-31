@@ -15,6 +15,46 @@ pip install password-finder
 
 Requires Python 3.9+. It has no runtime dependencies (standard library only).
 
+## What's new
+
+### Unreleased
+
+- **Wrapped sentences and paragraph gaps.** A value set apart in its own
+  paragraph is found even when the sentence introducing it was wrapped by the
+  sender's mail client. Runs of blank lines are collapsed first, so an HTML
+  body and its plain-text equivalent behave identically.
+- **Fewer prose false positives.** Function words (`not`, `only`, `now`, ...)
+  are never returned, and a plain run of letters in a single case scores well
+  below the level a caller would act on.
+
+### 2.3.0
+
+- **Blacklisting.** `extra_reject_tokens` lets you say a word is never a
+  password, merging with the built-in list. See
+  [Blacklisting words](#blacklisting-words).
+- **Raw email messages.** `extract_body` decodes quoted-printable, base64 and
+  multipart bodies, so a `.eml` file no longer yields a confidently wrong
+  answer. See [Raw email messages](#raw-email-messages).
+- **Invisible characters.** Zero-width spaces, bidi controls, soft hyphens and
+  byte-order marks are stripped before matching, so a password can no longer
+  look right on screen and fail when pasted.
+- **Passphrases.** A quoted value may contain spaces, so
+  `"correct horse battery staple"` comes back whole.
+- **Reply history.** A password quoted from an earlier message in a thread is
+  downranked, so the current one ranks first. It is still returned.
+- **Fragments.** A truncation of a better match at the same position is
+  dropped rather than offered as a second password.
+- **Secret hygiene.** `Candidate.__repr__` masks the password and the context
+  snippet, so logging a result no longer leaks it. See
+  [Handling secrets](#handling-secrets).
+- **Ranking.** Scores frequently reach the reported ceiling, so ties are now
+  settled on the underlying score and then on the earliest mention. The order
+  is total and reproducible.
+- **Ordinary words** such as `prompted` or `Accessible` are downranked in any
+  capitalisation, rather than scoring like a generated secret.
+- `__version__` is read from the installed package metadata, so it can no
+  longer drift from `pyproject.toml`.
+
 ## Usage
 
 The finder **always returns a list of candidates**, ranked by confidence — it
@@ -86,6 +126,21 @@ that follows. It matches six layouts:
    counts as a delimiter,
 6. **proximity** — a last-resort fallback: a bare, undelimited token that mixes
    letters *and* digits sitting close to the keyword.
+
+The last two reach across a line break, and across a blank line, so the very
+common shape below is recovered even though the sentence introducing the value
+was wrapped by the sender's mail client:
+
+```
+... please use the following password to open the
+attached document.
+
+Ab12Cd34
+```
+
+Reaching two lines down requires the value to stand alone on its line. Without
+that, the window is wide enough to pair a keyword with the value half of an
+unrelated label further down the message.
 
 Values wrapped in quotes, `*markdown*`, `` `backticks` `` or `(brackets)` are
 unwrapped automatically. A quoted value may contain spaces, so a passphrase such
