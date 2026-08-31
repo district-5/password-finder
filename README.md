@@ -17,6 +17,17 @@ Requires Python 3.9+. It has no runtime dependencies (standard library only).
 
 ## What's new
 
+### 2.4.1
+
+- **Ranking fix.** When a value whose extent the sender delimited replaced a
+  narrower match, it took over that match's position in the list, which could
+  report a candidate above one with a higher confidence. `find_all` again
+  returns candidates in confidence order in every case.
+- **Fewer apostrophe false positives.** A quoted value may contain spaces, but
+  the straight apostrophe no longer counts: prose is full of possessives, and
+  pairing one with the next read the sentence between them as a password. The
+  curly `‘ ’` pair still allows spaces.
+
 ### 2.4.0
 
 - **Wrapped sentences and paragraph gaps.** A value set apart in its own
