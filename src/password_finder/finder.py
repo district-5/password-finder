@@ -20,9 +20,50 @@ _DATE_RE = re.compile(
 )
 _CURRENCY_RE = re.compile(r"^[£$€¥]\d[\d,]*(?:\.\d+)?$")
 _PHONE_RE = re.compile(r"^[+()\d.\-\s]+$")
-# A domain-like "word.tld" optionally followed by a path -- catches whole URLs
-# and the fragments the loose pattern can carve out of one at its internal ":".
-_DOMAIN_RE = re.compile(r"(?i)[a-z0-9\-]{2,}\.[a-z]{2,}(?:/|$)")
+# A domain followed by a path. Any case: a path makes it a URL whatever the
+# capitalisation, and this catches the fragments the loose pattern can carve
+# out of one at its internal ":".
+_DOMAIN_PATH_RE = re.compile(r"(?i)[a-z0-9\-]{2,}\.[a-z]{2,}/")
+
+# A bare "label.suffix" ending the token. Matching any two letters after the
+# dot rejected real passwords that happen to contain one ("Kp7.Rnx", "Vq8.co"),
+# so the last label has to be a suffix people actually write: a top-level
+# domain, or the extension of an attached file. An unrecognised suffix leaves
+# the token alone, which is the safe direction: a password wrongly rejected
+# here is lost silently, whereas one wrongly kept is merely an extra
+# low-ranked candidate.
+_DOMAIN_TAIL_RE = re.compile(r"(?i)[a-z0-9\-]{2,}\.([a-z]{2,24})$")
+
+_COMMON_TLDS = frozenset({
+    # Generic.
+    "com", "org", "net", "edu", "gov", "mil", "int", "info", "biz", "name",
+    "pro", "app", "dev", "io", "ai", "cloud", "online", "site", "shop",
+    "store", "tech", "xyz", "blog", "news", "email", "live", "life", "world",
+    "group", "agency", "digital", "solutions", "services", "systems",
+    "network", "media", "design", "studio", "works", "team", "zone",
+    "center", "centre", "company", "limited", "ltd", "plc", "llp", "page",
+    # Country codes seen most often in mail.
+    "uk", "ie", "de", "fr", "es", "it", "nl", "be", "ch", "at", "se", "no",
+    "dk", "fi", "is", "pl", "cz", "sk", "hu", "ro", "bg", "gr", "pt", "tr",
+    "ru", "ua", "cn", "jp", "kr", "in", "sg", "hk", "au", "nz", "ca", "us",
+    "mx", "br", "ar", "cl", "za", "ng", "ke", "ae", "il", "eu", "me", "tv",
+    "cc", "co", "ly", "sh", "gg", "je", "im",
+})
+
+# Extensions of things people attach. A token ending in one is the name of the
+# file the password opens, not the password: these messages nearly always name
+# the attachment a line or two from the keyword.
+_FILE_EXTENSIONS = frozenset({
+    "pdf", "zip", "7z", "rar", "tar", "gz", "tgz", "doc", "docx", "docm",
+    "xls", "xlsx", "xlsm", "ppt", "pptx", "csv", "txt", "rtf", "odt", "ods",
+    "odp", "pages", "numbers", "jpg", "jpeg", "png", "gif", "bmp", "tif",
+    "tiff", "svg", "htm", "html", "xml", "json", "msg", "eml", "p7m", "p7s",
+    "p12", "pfx", "key", "log", "bak", "dat", "exe", "dmg", "iso", "mp3",
+    "mp4", "mov", "wav",
+})
+
+# A dotted suffix that means the token is something other than a password.
+_NON_PASSWORD_SUFFIXES = _COMMON_TLDS | _FILE_EXTENSIONS
 
 _OPENERS = frozenset('"\'“‘*`([{<')
 
@@ -89,9 +130,26 @@ _REPLY_SEPARATOR_RE = re.compile(
     r")"
 )
 
-# Used to decide, automatically, whether a string is HTML: a tag-shaped run, or
-# an HTML entity (named, decimal, or hex).
-_HTML_TAG_RE = re.compile(r"<\s*[a-z!/][^>]*>", re.IGNORECASE)
+# Used to decide, automatically, whether a string is HTML: a real tag, or an
+# HTML entity (named, decimal, or hex).
+#
+# The tag name has to be one that exists. Accepting any "<letter...>" run meant
+# a plain-text password containing angle brackets ("Zr8<Mk4>") made the whole
+# message look like markup, and the "tag" was stripped out of the middle of the
+# password before matching. Every HTML mail carries at least one of these.
+_HTML_TAG_NAMES = (
+    "a|abbr|address|area|article|aside|b|base|blockquote|body|br|button|"
+    "canvas|caption|center|cite|code|col|colgroup|dd|del|details|dfn|div|dl|"
+    "dt|em|embed|fieldset|figcaption|figure|font|footer|form|h1|h2|h3|h4|h5|"
+    "h6|head|header|hr|html|i|iframe|img|input|ins|kbd|label|legend|li|link|"
+    "main|map|mark|menu|meta|nav|noscript|object|ol|optgroup|option|p|param|"
+    "picture|pre|q|s|samp|script|section|select|small|source|span|strike|"
+    "strong|style|sub|summary|sup|svg|table|tbody|td|template|tfoot|th|thead|"
+    "time|title|tr|tt|u|ul|var|video|wbr"
+)
+_HTML_TAG_RE = re.compile(
+    r"<\s*(?:!|/?\s*(?:%s)\b)[^>]*>" % _HTML_TAG_NAMES, re.IGNORECASE
+)
 _HTML_ENTITY_RE = re.compile(r"&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]+);", re.IGNORECASE)
 
 
@@ -599,8 +657,12 @@ class PasswordFinder:
         if _EMAIL_RE.match(token):
             return True
         # Bare domain or domain/path (incl. a URL fragment split off at its ":").
-        if "." in token and _DOMAIN_RE.search(token):
-            return True
+        if "." in token:
+            if _DOMAIN_PATH_RE.search(token):
+                return True
+            tail = _DOMAIN_TAIL_RE.search(token)
+            if tail is not None and tail.group(1).lower() in _NON_PASSWORD_SUFFIXES:
+                return True
         if _TIME_RE.match(token):
             return True
         if _DATE_RE.match(token):

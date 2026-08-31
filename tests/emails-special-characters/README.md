@@ -75,17 +75,19 @@ therefore out of reach. Put the character inside the value instead, as
 
 **Rejected outright.** These are read as a different kind of thing:
 
-- **Ends in a dot and two or more letters** (`Kp7.Rnx`, `Vq8.co`) reads as a
-  domain. Note the boundary: `Kp7.Rn9` survives, because it ends in a digit.
+- **Ends in a dot and a real suffix** (`Vq8.co`, `Kp7.pdf`) reads as a domain or
+  a file name. Only suffixes people actually write count, so a dot on its own is
+  harmless: `Kp7.Rnx` and `Kp7.Rnx.Vq4` come back fine, per
+  `dotted-password.txt`.
 - **Email shaped** (`Kp7@Rn2.co`) reads as an address. An at sign on its own is
   fine, which is what `at-sign-not-an-email.txt` pins down.
 - **All digits and separators with seven or more digits** reads as a telephone
   number. One letter anywhere is enough to save it, per `phone-like-digits.txt`.
 
-**Angle brackets need an HTML fixture.** In a plain-text body, `<Mk4>` makes the
-whole message look like HTML, and the "tag" is stripped before matching. Write
-that case as HTML using `&lt;` and `&gt;`, as `escaped-angle-brackets.html`
-does.
+Angle brackets work in either form. A plain-text body keeps them, because
+`<Mk4>` is not a tag name (`angle-brackets-plain-text.txt`); an HTML body needs
+them escaped as `&lt;` and `&gt;`, since there they really would be markup
+(`escaped-angle-brackets.html`).
 
 ## Anonymisation
 

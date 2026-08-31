@@ -323,6 +323,54 @@ def test_reject_tokens_can_be_replaced_wholesale() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Shapes that only look like something else.                                   #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "password",
+    ["Kp7.Rnx", "Rt5.Zqm", "Kp7.Rn9", "Kp7.Rnx.Vq4", "Kx4.Nq9!"],
+)
+def test_a_dot_does_not_make_a_password_a_domain(password: str) -> None:
+    # Rejecting any "label.letters" tail lost real passwords silently. Only a
+    # suffix people actually write is treated as a domain or a file name.
+    assert PasswordFinder().find_passwords(f"The password is {password}") == [password]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The password is https://example.com/reset",
+        "The password is www.example.com/reset",
+        "The password portal is example.com",
+        "The password portal is Example.com",          # capitalised, still a domain
+        "The password portal is example.co.uk",
+        "The password is Example_Q3_Accounts.pdf",     # the attachment, not the password
+        "The password is Statements_August.zip",
+    ],
+)
+def test_domains_urls_and_file_names_are_still_rejected(text: str) -> None:
+    assert PasswordFinder().find_all(text) == []
+
+
+def test_angle_brackets_survive_in_a_plain_text_body() -> None:
+    # "<Mk4>" is not a tag name, so the message is plain text and the brackets
+    # are part of the password rather than markup to be stripped.
+    assert PasswordFinder().find_passwords("The password is Zr8<Mk4>") == ["Zr8<Mk4>"]
+
+
+def test_angle_brackets_still_work_when_escaped_in_html() -> None:
+    body = "<div><p>The password is <b>Zr8&lt;Mk4&gt;</b></p></div>"
+    assert PasswordFinder().find_passwords(body) == ["Zr8<Mk4>"]
+
+
+def test_a_real_tag_still_marks_a_body_as_html() -> None:
+    # Table-cell markup with no surrounding <html> is a common mail fragment.
+    body = "<tr><td>Password</td><td>Secret1</td></tr>"
+    assert PasswordFinder().find_passwords(body) == ["Secret1"]
+
+
+# --------------------------------------------------------------------------- #
 # Layouts real senders produce: wrapped sentences and paragraph gaps.          #
 # --------------------------------------------------------------------------- #
 
@@ -772,6 +820,9 @@ def test_module_level_helper_accepts_extra_reject_tokens() -> None:
         ("Total is 5 &lt; 10", True),
         ("The password is Secret1.", False),               # plain text
         ("Contact us at sales & marketing", False),        # bare & is not an entity
+        ("The password is Zr8<Mk4>", False),               # not a tag name
+        ("Use the <Kq7> token", False),
+        ("<td>Password</td><td>Secret1</td>", True),       # a real tag, no <html>
         ("", False),
     ],
 )
