@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "password-finder"
-version = "2.3.0"
+version = "2.4.0"
 description = "Extract passwords from free-form text such as email bodies (e.g. a password for an encrypted attachment sent in a separate message)."
 readme = "README.md"
 requires-python = ">=3.9"
