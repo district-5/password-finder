@@ -35,15 +35,21 @@ _STATED_EXTENT_PATTERNS = frozenset({"delimited", "wrapped"})
 # off in quotes / emphasis / brackets. Inner length >= 2 so junk like the "(s)"
 # in "document(s)" is skipped in favour of the real value further along.
 #
-# Quote-like delimiters allow inner spaces, because a quoted value states its
-# own extent and passphrases legitimately contain them ("correct horse battery
-# staple"). The match is lazy so it stops at the first closing quote rather
-# than swallowing the rest of the line. Brackets keep the no-space rule: they
-# wrap ordinary prose ("(see below)") far more often than they wrap a value.
+# Most quote-like delimiters allow inner spaces, because a quoted value states
+# its own extent and passphrases legitimately contain them ("correct horse
+# battery staple"). The match is lazy so it stops at the first closing quote
+# rather than swallowing the rest of the line.
+#
+# Two exceptions keep the no-space rule. Brackets wrap ordinary prose
+# ("(see below)") far more often than they wrap a value. And the straight
+# apostrophe is a letter as much as a delimiter: English prose is full of
+# possessives and contractions, so allowing spaces between two of them pairs
+# "today's" with "auditor's" and reads the sentence between as a password. The
+# curly pair is safe, because an opening U+2018 is never a contraction.
 _DELIMITED_VALUE = (
     r'\*[^*\r\n]{2,160}?\*'
     r'|"[^"\r\n]{2,160}?"'
-    r"|'[^'\r\n]{2,160}?'"
+    r"|'[^'\s]{2,160}'"
     r'|`[^`\r\n]{2,160}?`'
     r'|\([^)\s]{2,160}\)'
     r'|\[[^\]\s]{2,160}\]'
@@ -259,12 +265,18 @@ class PasswordFinder:
 
         Two patterns reading the same text can yield "Ab12 Cd34" and "Ab12",
         which are not two passwords but one password and a fragment of it. The
-        The better-scoring candidate normally wins. The exception is a match
-        whose extent the sender stated with delimiters: a quoted "Ab12 Cd34"
-        overrides a higher-scoring "Ab12" from a pattern that stopped at the
-        first space, and takes over its position in the ranking. An inferred
-        extent gets no such privilege, so a stray connector character swept up
-        by a loose match cannot displace the clean token beside it.
+        better-scoring candidate normally wins. The exception is a match whose
+        extent the sender stated with delimiters: a quoted "Ab12 Cd34" removes
+        a higher-scoring "Ab12" that came from a pattern stopping at the first
+        space. An inferred extent gets no such privilege, so a stray connector
+        character swept up by a loose match cannot displace the clean token
+        beside it.
+
+        ``ranked`` arrives sorted, and the survivors keep that order: a
+        superseding candidate takes its own place in the ranking rather than the
+        place of the fragment it removed. Inheriting that position would report
+        a candidate above one with a higher confidence, which contradicts what
+        :meth:`find_all` promises its caller.
 
         Candidates at a different position always survive: a message really can
         carry two similar passwords, or repeat one.
@@ -275,16 +287,10 @@ class PasswordFinder:
             if any(cls._covers(other, candidate) for other in kept):
                 continue
 
-            superseded = None
             if candidate.pattern in _STATED_EXTENT_PATTERNS:
-                superseded = next(
-                    (i for i, other in enumerate(kept) if cls._covers(candidate, other)),
-                    None,
-                )
-            if superseded is None:
-                kept.append(candidate)
-            else:
-                kept[superseded] = candidate
+                kept = [other for other in kept if not cls._covers(candidate, other)]
+
+            kept.append(candidate)
 
         return kept
 

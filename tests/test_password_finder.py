@@ -523,7 +523,7 @@ def test_quoted_history_penalty_is_configurable() -> None:
     "text,expected",
     [
         ('The password is "correct horse battery staple"', "correct horse battery staple"),
-        ("The passphrase is 'open the blue door'", "open the blue door"),
+        ("The password is \u2018open the blue door\u2019", "open the blue door"),
         ("Your password is *two words here*", "two words here"),
         ("The password is \u201csmart quoted phrase\u201d", "smart quoted phrase"),
         ("The password is `two tokens`", "two tokens"),
@@ -531,6 +531,27 @@ def test_quoted_history_penalty_is_configurable() -> None:
 )
 def test_quoted_value_may_contain_spaces(text: str, expected: str) -> None:
     assert PasswordFinder().find_all(text)[0].password == expected
+
+
+def test_straight_apostrophes_do_not_delimit_a_spaced_value() -> None:
+    # An apostrophe is a letter as much as a delimiter. Allowing spaces between
+    # two of them pairs one possessive with the next and reads the sentence in
+    # between as a password, which is how "acces is 0000 =00" got produced.
+    text = "Please use today's password rather than the auditor's copy"
+    assert all(" " not in c.password for c in PasswordFinder().find_all(text))
+
+
+def test_apostrophe_pair_without_spaces_still_delimits() -> None:
+    assert PasswordFinder().find_all("The password is 'Ab12Cd34'")[0].password == "Ab12Cd34"
+
+
+def test_ranking_survives_a_superseding_match() -> None:
+    # A stated-extent match removes the fragment it covers but takes its own
+    # place in the ranking. Inheriting the fragment's position would report a
+    # candidate above one with a higher confidence.
+    text = " code d'acces is 0000 =00'A"
+    confidences = [c.confidence for c in PasswordFinder().find_all(text)]
+    assert confidences == sorted(confidences, reverse=True), confidences
 
 
 def test_quoted_value_stops_at_the_closing_quote() -> None:
