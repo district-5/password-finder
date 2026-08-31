@@ -55,6 +55,38 @@ Check a new fixture by hand — remember to drop the first line yourself, since
 tail -n +2 tests/emails-special-characters/escaped-ampersand.html | find-password
 ```
 
+## Known boundaries
+
+Some shapes cannot be expressed in this corpus at all, because the finder will
+never return them. They are listed here so nobody spends an afternoon writing a
+fixture that cannot pass.
+
+**By design.** Trimming runs on every match, so these come back shortened:
+
+| Written in the message | Returned | Why |
+| --- | --- | --- |
+| `Kp7Rn2Wq.` | `Kp7Rn2Wq` | trailing `.` `,` `;` `:` is sentence punctuation. `!` and `?` are kept, so `Nx6Bt2Kq?` is fine |
+| `"Kp7Rn2Wq"` | `Kp7Rn2Wq` | a matched wrapper pair is unwrapped |
+| `*Kp7Rn2Wq*` | `Kp7Rn2Wq` | same, and this is how HTML emphasis arrives |
+
+A password that genuinely ends in `.` or is genuinely wrapped in quotes is
+therefore out of reach. Put the character inside the value instead, as
+`internal-full-stop.txt` and `apostrophe-inside.txt` do.
+
+**Rejected outright.** These are read as a different kind of thing:
+
+- **Ends in a dot and two or more letters** (`Kp7.Rnx`, `Vq8.co`) reads as a
+  domain. Note the boundary: `Kp7.Rn9` survives, because it ends in a digit.
+- **Email shaped** (`Kp7@Rn2.co`) reads as an address. An at sign on its own is
+  fine, which is what `at-sign-not-an-email.txt` pins down.
+- **All digits and separators with seven or more digits** reads as a telephone
+  number. One letter anywhere is enough to save it, per `phone-like-digits.txt`.
+
+**Angle brackets need an HTML fixture.** In a plain-text body, `<Mk4>` makes the
+whole message look like HTML, and the "tag" is stripped before matching. Write
+that case as HTML using `&lt;` and `&gt;`, as `escaped-angle-brackets.html`
+does.
+
 ## Anonymisation
 
 The same rules as everywhere else in this repository: **no real passwords, no

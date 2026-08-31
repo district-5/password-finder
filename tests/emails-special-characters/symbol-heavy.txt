@@ -1,0 +1,17 @@
+#$%K&*!
+
+Hi Owen,
+
+Test credentials for the staging environment attached, encrypted.
+
+The password is #$%K&*!
+
+Our generator was misconfigured and produced something that is almost all
+punctuation with a single letter in it. It works, but we are changing the
+character set next week, so do not save it anywhere permanent.
+
+Staging was refreshed from production on Friday, so the data is current as of
+then. Remember that outbound mail from staging is captured rather than
+delivered.
+
+Example Platform Engineering
