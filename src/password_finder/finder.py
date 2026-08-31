@@ -63,6 +63,13 @@ _INVISIBLE_RE = re.compile(
 # Unicode line separators are line breaks, not token characters.
 _LINE_SEPARATOR_RE = re.compile("[\u2028\u2029]")
 
+# A run of three or more line breaks. Stripping HTML turns every block-level
+# close tag into a break, and the source usually has its own newline after it,
+# so a single paragraph gap in the markup routinely arrives here as three or
+# four breaks. Collapsing the run to one blank line makes an HTML body and the
+# plain-text equivalent present the same shape to the patterns.
+_BLANK_LINE_RUN_RE = re.compile(r"(?:[ \t]*\r?\n){3,}")
+
 # Quoted reply history: lines a mail client prefixed with ">", and everything
 # following a reply separator. A password quoted from an earlier message is
 # usually the superseded one, so matches inside these regions are downranked.
@@ -319,19 +326,42 @@ class PasswordFinder:
 
         def filler(budget: int) -> str:
             """The run the delimited/proximity patterns allow between keyword
-            and value: ``budget`` characters of the keyword's own line, or that
-            plus a line break -- one blank line included, since senders
-            routinely set the value on a paragraph of its own -- and ``budget``
-            characters of the line the value sits on.
+            and value.
 
-            Crossing the break requires the keyword's line to carry at least one
-            more visible character ("... the password to open it.\\n\\nAb12Cd34").
-            A keyword that ends its line is a label, and belongs to the
-            "nextline" pattern, which scores that weaker layout accordingly.
+            Either ``budget`` characters of the keyword's own line, or that
+            followed by up to two line breaks carrying ``budget`` characters of
+            text each. Two are needed because the sentence introducing a
+            password is routinely wrapped by the sender's mail client, and the
+            value then set in a paragraph of its own::
+
+                ... please use the following password to open the
+                attached document.
+
+                Ab12Cd34
+
+            A break may swallow one blank line, which is what makes that
+            paragraph gap reachable.
+
+            Crossing the second break requires the value to start a line of its
+            own. Without that, two breaks reach far enough to pair a keyword
+            with the value half of an unrelated label further down the message
+            ("a password protected PDF" ... "Payroll group: EX-MONTHLY-03").
+            A value set apart in its own paragraph is the shape worth reaching
+            for; one sitting after a label on a shared line is that label's.
+
+            Crossing any break requires the preceding line to carry at least one
+            more visible character. A keyword that ends its own line is a label,
+            and belongs to the "nextline" pattern, which scores that weaker
+            layout accordingly.
             """
             same_line = r"[^\r\n]{0,%d}?" % budget
             break_ = r"[^\s\r\n][ \t]*\r?\n(?:[ \t]*\r?\n)?[ \t]*"
-            return r"(?P<filler>%s|%s%s%s)" % (same_line, same_line, break_, same_line)
+
+            one_break = r"%s%s%s" % (same_line, break_, same_line)
+            # Ends on the break itself, so the value has to start its own line.
+            two_breaks = r"%s%s%s%s" % (same_line, break_, same_line, break_)
+
+            return r"(?P<filler>%s|%s|%s)" % (same_line, one_break, two_breaks)
 
         open_ = "[\"'“‘*`(\\[{<]"
 
@@ -454,11 +484,14 @@ class PasswordFinder:
 
         Runs after entity decoding so an escaped "&#8203;" is caught too. A
         non-breaking space becomes an ordinary one: it is a separator wherever
-        it appears, and the patterns match plain spaces.
+        it appears, and the patterns match plain spaces. Runs of blank lines
+        collapse to one, so a paragraph gap looks the same whether it arrived
+        as markup or as plain text.
         """
         text = _INVISIBLE_RE.sub("", text)
         text = _LINE_SEPARATOR_RE.sub("\n", text)
-        return text.replace("\u00a0", " ")
+        text = text.replace("\u00a0", " ")
+        return _BLANK_LINE_RUN_RE.sub("\n\n", text)
 
     @staticmethod
     def _strip_html(text: str) -> str:

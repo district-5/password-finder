@@ -97,6 +97,10 @@ DEFAULT_REJECT_TOKENS: frozenset[str] = frozenset({
     "is", "are", "be", "the", "a", "an", "to", "as", "below", "above",
     "attached", "attachment", "here", "follows", "following", "same",
     "provided", "sent", "separately", "separate", "and", "or", "will",
+    # Function words that turn up mid-sentence right after a keyword, as in
+    # "the password is not the same as the one used previously".
+    "not", "no", "nor", "but", "only", "also", "just", "now", "then",
+    "there", "when", "which", "while", "with", "your", "our", "any", "all",
     # Passive-delivery verbs: "a password will be emailed/issued to you" means
     # the password is being sent, not present in this message.
     "emailed", "e-mailed", "mailed", "posted", "issued", "supplied",
@@ -139,6 +143,12 @@ DEFAULT_DICTIONARY_WORDS: frozenset[str] = frozenset({
     "relevant", "necessary", "appropriate", "successful", "complete",
     "completed", "remember", "forget", "receive", "received", "contact",
     "question", "questions", "detail", "details", "reference", "account",
+    # Adverbs that follow "the password is ..." in security boilerplate, as in
+    # "any account sharing that password is immediately at risk".
+    "immediately", "automatically", "normally", "usually", "always", "never",
+    "often", "already", "still", "simply", "therefore", "however", "instead",
+    "otherwise", "shortly", "separately", "securely", "safely", "directly",
+    "currently", "temporarily", "permanently", "unique", "invalid",
 })
 
 
@@ -177,7 +187,7 @@ class Weights:
     class_bonus_per_class: float = 0.045  # per character class beyond the first
     entropy_scale: float = 0.02         # * Shannon entropy (bits), capped
     entropy_cap: float = 4.0
-    lowercase_word_penalty: float = 0.08  # looks like a plain dictionary word
+    lowercase_word_penalty: float = 0.45  # single-case/title-case, letters only
     dictionary_word_penalty: float = 0.30  # a known ordinary word (see below)
     quoted_history_penalty: float = 0.20   # found in quoted reply history
     wrapped_value_bonus: float = 0.08   # value was quoted/bracketed (deliberate)

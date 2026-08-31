@@ -323,6 +323,98 @@ def test_reject_tokens_can_be_replaced_wholesale() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Layouts real senders produce: wrapped sentences and paragraph gaps.          #
+# --------------------------------------------------------------------------- #
+
+
+def test_wrapped_sentence_then_value_in_its_own_paragraph() -> None:
+    # The introducing sentence is wrapped by the sender's mail client and the
+    # value set apart below it. Two line breaks separate keyword from value.
+    text = (
+        "When the statement arrives, please use the following password to open the\n"
+        "attached document.\n"
+        "\n"
+        "Hq4Vd8Ls\n"
+        "\n"
+        "Please note, this password is CASE SENSITIVE.\n"
+    )
+    assert PasswordFinder().find_all(text)[0].password == "Hq4Vd8Ls"
+
+
+def test_two_breaks_require_the_value_to_start_its_line() -> None:
+    # Reaching two lines down must not pair a keyword with the value half of an
+    # unrelated label, which is what a wider window would otherwise do.
+    text = (
+        "Your payslip is attached as a password protected PDF.\n"
+        "\n"
+        "Employee number: 4471902\n"
+        "Payroll group: EX-MONTHLY-03\n"
+    )
+    assert PasswordFinder().find_passwords(text) == []
+
+
+def test_blank_line_runs_collapse() -> None:
+    # Stripping HTML turns a block close tag into a break and the source
+    # usually adds its own, so one paragraph gap arrives as three or four
+    # breaks. The HTML and plain-text forms must behave identically.
+    html_body = (
+        "<p>To open it, enter the following password when prompted:</p>\n"
+        "\n"
+        '  <p style="font-size:16px">Tq2Mw8Jc</p>\n'
+    )
+    plain = (
+        "To open it, enter the following password when prompted:\n"
+        "\n"
+        "Tq2Mw8Jc\n"
+    )
+    finder = PasswordFinder()
+    assert finder.find_all(html_body)[0].password == "Tq2Mw8Jc"
+    assert finder.find_all(plain)[0].password == "Tq2Mw8Jc"
+
+
+# --------------------------------------------------------------------------- #
+# Prose after a keyword: function words and plain words are not passwords.     #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The password is not the same as the one used previously",
+        "The password is now different",
+        "The password is only valid for seven days",
+        "The password is also used on the second file",
+    ],
+)
+def test_function_words_are_never_returned(text: str) -> None:
+    # Mid-sentence function words sit exactly where a value would.
+    assert PasswordFinder().find_passwords(text) == []
+
+
+def test_plain_word_after_a_keyword_is_not_convincing() -> None:
+    # "any account sharing that password is immediately at risk" is prose, not
+    # a password. A single-case run of letters is weak evidence, so it must
+    # land well below the confidence a caller would act on.
+    text = "If a site is breached, any account sharing that password is immediately at risk."
+    for candidate in PasswordFinder().find_all(text):
+        assert candidate.confidence < 0.35, (candidate.password, candidate.confidence)
+
+
+def test_the_word_penalty_leaves_real_passwords_alone() -> None:
+    # The penalty keys on shape, not on the value, so anything carrying a digit
+    # or mixed case is untouched by it.
+    finder = PasswordFinder()
+    for text, expected in [
+        ("The password is Sunshine42", "Sunshine42"),
+        ("The password is Hunter2!", "Hunter2!"),
+        ("Your pin is aTlKeiEa", "aTlKeiEa"),
+    ]:
+        best_candidate = finder.find_all(text)[0]
+        assert best_candidate.password == expected
+        assert best_candidate.confidence > 0.6
+
+
+# --------------------------------------------------------------------------- #
 # Secret hygiene: repr is what leaks into logs, so it must not carry the value.#
 # --------------------------------------------------------------------------- #
 

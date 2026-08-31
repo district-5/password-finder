@@ -1,0 +1,24 @@
+You have a new secure message
+
+A new document has been made available to you in the Example client portal.
+
+Document: Annual review pack
+Reference: 8841027733
+Available until: 30 September 2026
+
+For your security, documents are not sent as email attachments and passwords
+are never included in an email of this kind. To read the document, sign in to
+the portal using your usual credentials:
+
+  example.com/portal
+
+If you have forgotten your sign-in details, use the "trouble signing in" link
+on the portal home page. For your protection we cannot send sign-in details by
+email or read them out over the telephone.
+
+If you have not used the portal before, you will have received an activation
+email when your account was created. That link is valid for 30 days; if yours
+has expired, ask your usual contact to send another.
+
+Example Wealth Management
+This mailbox is not monitored.

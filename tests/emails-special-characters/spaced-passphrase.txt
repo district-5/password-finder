@@ -1,0 +1,23 @@
+harbour lantern seven
+
+Dear Dr Ferreira,
+
+The reviewer comments and the marked-up manuscript are attached in a single
+encrypted archive, as agreed with the editorial office.
+
+Because the archive will be opened by several people on your side, we have used
+a phrase rather than a generated string this time. The passphrase is
+"harbour lantern seven" including the spaces but without the quotation marks.
+
+Please treat the reviewer identities as confidential. The comments may be
+shared with your co-authors, but the reviewer names may not.
+
+We would be grateful for your response within 28 days. If you need longer,
+reply to the editorial office quoting manuscript number MS-2026-04417 and we
+will agree a revised date.
+
+Kind regards,
+
+Editorial Office
+Example Journal of Applied Systems
+example.com/journal
