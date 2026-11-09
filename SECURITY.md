@@ -58,8 +58,11 @@ In scope:
   input that is merely unusual rather than invalid.
 - **Leaks of extracted values** into places a caller did not choose: an
   exception message, a warning, `repr()` output, or a temporary file.
-- **Supply-chain problems**: a compromised or typo-squatted `password-finder`
-  release, or a tampered artefact.
+- **Supply-chain problems**: a compromised `password-finder` release or a
+  tampered artefact. The package is distributed only from this repository's
+  [GitHub releases](https://github.com/district-5/password-finder/releases) and
+  is not on PyPI, so a `password-finder` package on PyPI or any other index is
+  not ours.
 
 Out of scope — real reports, but not security ones, so please use the
 [issue templates](https://github.com/district-5/password-finder/issues/new/choose):

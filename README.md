@@ -19,7 +19,7 @@ pip install "git+https://github.com/district-5/password-finder.git"
 To pin a specific release, add its tag:
 
 ```bash
-pip install "git+https://github.com/district-5/password-finder.git@v2.4.2"
+pip install "git+https://github.com/district-5/password-finder.git@v2.4.3"
 ```
 
 Or clone it and install from the working copy:
@@ -31,11 +31,17 @@ pip install .
 ```
 
 In a `requirements.txt`, use
-`password-finder @ git+https://github.com/district-5/password-finder.git@v2.4.2`.
+`password-finder @ git+https://github.com/district-5/password-finder.git@v2.4.3`.
 
 Requires Python 3.9+. It has no runtime dependencies (standard library only).
 
 ## What's new
+
+### 2.4.3
+
+- **No longer on PyPI.** The package is installed from GitHub instead; see
+  [Installation](#installation). Each tagged version gets a GitHub release
+  with the built wheel and sdist attached.
 
 ### 2.4.2
 
