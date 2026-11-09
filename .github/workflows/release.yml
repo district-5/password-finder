@@ -1,16 +1,10 @@
 name: Release
 
-# Publishes to PyPI when a v* tag is pushed, using Trusted Publishing (OIDC) --
-# no API token is stored in this repository.
+# Builds the sdist and wheel when a v* tag is pushed and attaches them to a
+# GitHub Release for that tag. The package is not published to PyPI; users
+# install it from GitHub (see the README).
 #
-# One-time setup, both required before the first tag:
-#   1. On PyPI: Account -> Publishing -> add a GitHub publisher with
-#        owner: district-5   repo: password-finder
-#        workflow: release.yml   environment: pypi
-#   2. On GitHub: Settings -> Environments -> create an environment named "pypi"
-#        (adding required reviewers there gives you a manual gate before upload)
-#
-# Re-running after a failed publish: Actions -> Release -> Run workflow, and
+# Re-running after a failed release: Actions -> Release -> Run workflow, and
 # pick the tag. No need to delete and re-push the tag.
 
 on:
@@ -78,13 +72,12 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-  publish:
-    name: Publish to PyPI
+  release:
+    name: Create the GitHub release
     needs: build
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
-    environment: pypi
     permissions:
-      id-token: write   # required for Trusted Publishing
       contents: write   # required to create the GitHub release
     steps:
       - name: Download the distributions
@@ -93,11 +86,7 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-
       - name: Create the GitHub release
-        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

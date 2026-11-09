@@ -9,9 +9,29 @@ Q3Report2026z"*. This library pulls that password back out.
 
 ## Installation
 
+This package is **not published on PyPI** — it is distributed from GitHub
+only. Install it straight from the repository:
+
 ```bash
-pip install password-finder
+pip install "git+https://github.com/district-5/password-finder.git"
 ```
+
+To pin a specific release, add its tag:
+
+```bash
+pip install "git+https://github.com/district-5/password-finder.git@v2.4.2"
+```
+
+Or clone it and install from the working copy:
+
+```bash
+git clone https://github.com/district-5/password-finder.git
+cd password-finder
+pip install .
+```
+
+In a `requirements.txt`, use
+`password-finder @ git+https://github.com/district-5/password-finder.git@v2.4.2`.
 
 Requires Python 3.9+. It has no runtime dependencies (standard library only).
 
