@@ -9,7 +9,36 @@ Q3Report2026z"*. This library pulls that password back out.
 
 ## Installation
 
-This package is **not published on PyPI** — it is distributed from GitHub
+### Switching an existing install from PyPI
+
+Versions up to 2.4.2 were published on PyPI. They have been removed from
+there, so `pip install password-finder` will no longer find the package (or
+could find someone else's under the same name). If you installed it from
+PyPI, swap it for the GitHub install:
+
+```bash
+pip uninstall password-finder
+pip install "git+https://github.com/district-5/password-finder.git@v2.4.3"
+```
+
+The package name, import name (`password_finder`) and CLI commands
+(`find-password`, `scan-emails`) are unchanged, so no code changes are needed.
+
+Then update anywhere the dependency is declared:
+
+- **`requirements.txt`**: replace `password-finder==2.4.2` (or similar) with
+  `password-finder @ git+https://github.com/district-5/password-finder.git@v2.4.3`.
+- **`pyproject.toml` / `setup.py` dependencies**: use the same
+  `password-finder @ git+...` form. Note that PyPI will refuse to publish a
+  package whose dependencies point at a URL, so a library you publish there
+  cannot depend on this one this way.
+
+`pip freeze` shows `password-finder @ git+https://github.com/...` once the
+switch has taken.
+
+### Installing from GitHub
+
+This package is **not published on PyPI**. It is distributed from GitHub
 only. Install it straight from the repository:
 
 ```bash
